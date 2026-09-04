@@ -188,6 +188,7 @@ Set these Supabase function secrets (production):
 | `RAZORPAY_KEY_SECRET` | Razorpay → Settings → API Keys |
 | `RAZORPAY_WEBHOOK_SECRET` | Razorpay → Settings → Webhooks → signing secret |
 | `RAZORPAY_RECONCILE_SECRET` | Any strong random string; sent as `x-okavo-notify` to `razorpay-reconcile` |
+| `RAZORPAY_PAYMENTS_ENABLED` | Set to `true` only after the live domain and webhook have been verified |
 | `SITE_URL` | `https://okavo.org` |
 | `IDENTITY_SWEEP_SECRET` | Any strong random string; gate for `identity-retention-sweep` |
 | `RATE_LIMIT_SALT` | Optional; salts hashed rate-limit buckets (defaults to `okavo-edge-v1`) |
@@ -203,6 +204,28 @@ In Razorpay, add one webhook endpoint pointing at
 `https://fzgnzaflvbimbiseqnrz.supabase.co/functions/v1/razorpay-webhook`.
 `razorpay-reconcile` is read-only by default (reports drift); it only writes
 settlements when invoked with `ALLOW_PAYMENT_RECONCILIATION=true`.
+
+Before setting `RAZORPAY_PAYMENTS_ENABLED=true`, Razorpay Dashboard must show
+`https://okavo.org` as approved under **Account & Settings → Business website
+details**. Run one live ₹1/₹99 smoke payment and confirm that the payment is
+`captured`, its webhook event is processed, and the matching Okavo payment row
+is `paid`. Leave the flag unset or `false` while the domain is pending or after
+any payment-integrity deployment mismatch; checkout then fails closed before an
+order is created.
+
+If the same Razorpay merchant also serves another business website, add Okavo
+with **Add additional website/app**. Do not replace the approved primary
+website: an approved edit replaces it and can stop that website's checkout.
+After adding or changing any domain, leave payments disabled until Razorpay
+shows every domain that must collect money as approved.
+
+The production schema and edge functions must be deployed together. Apply
+migrations `0021` through `0025` in filename order before deploying
+`razorpay-order`, `razorpay-confirm`, `razorpay-webhook`, and
+`razorpay-reconcile`. In particular, migration `0023_payment_ops.sql` creates
+the provider IDs, webhook ledger, settlement RPC, and operations events used by
+those functions. Deploying the functions first leaves captured payments unable
+to reconcile.
 
 Prices for platform fees live in `apps/catalog/src/lib/pricing.ts` (display) and
 the Razorpay edge functions (charge in INR paise): ₹99 posting / ₹899 membership,

@@ -61,6 +61,16 @@ serve(async (req) => {
   if (req.method !== "POST") {
     return json(405, { error: "Method not allowed" }, req);
   }
+  if (Deno.env.get("RAZORPAY_PAYMENTS_ENABLED") !== "true") {
+    return json(
+      503,
+      {
+        error:
+          "Payments are temporarily unavailable while the payment account is being verified. You have not been charged.",
+      },
+      req
+    );
+  }
 
   let user: { id: string; email?: string };
   try {
