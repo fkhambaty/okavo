@@ -81,8 +81,8 @@ export function onMemorySessionChange(listener: SessionListener): () => void {
 
 export async function refreshMemorySession(): Promise<Session | null> {
   if (refreshPromise) return refreshPromise;
-  refreshPromise = request<{ session: PublicSession }>("/api/auth/session")
-    .then(({ session }) => publish(asSession(session)))
+  refreshPromise = request<{ session: PublicSession | null }>("/api/auth/session")
+    .then(({ session }) => publish(session ? asSession(session) : null))
     .catch(() => publish(null))
     .finally(() => {
       refreshPromise = null;

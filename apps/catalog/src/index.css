@@ -4303,7 +4303,7 @@ td code,
     border-bottom: 1px solid var(--line);
     position: sticky;
     top: 0;
-    z-index: 30;
+    z-index: 38;
   }
 
   .mobile-bar .logo {

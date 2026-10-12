@@ -157,6 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const recovery =
       new URLSearchParams(window.location.search).get("recovery") === "1";
     if (recovery) setPasswordRecovery(true);
+    let cancelled = false;
     const unsubscribe = onMemorySessionChange((nextSession) => {
       setSession(nextSession);
       if (nextSession) {
@@ -169,9 +170,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    refreshMemorySession().finally(() => setReady(true));
+    // Stay on the loading screen until the profile role is known. Marking
+    // ready while the role is still guest sends a signed-in refresh to the
+    // public homepage.
+    refreshMemorySession()
+      .then(async (nextSession) => {
+        if (cancelled || !nextSession) return;
+        await ensureProfile(nextSession);
+      })
+      .finally(() => {
+        if (!cancelled) setReady(true);
+      });
 
-    return unsubscribe;
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, [demoMode, ensureProfile]);
 
   const signUp = useCallback(async (input: SignUpInput) => {
