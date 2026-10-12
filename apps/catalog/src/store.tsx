@@ -205,6 +205,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [postingFeesPaid, setPostingFeesPaid] = useState(0);
 
+  useEffect(() => {
+    if (auth.demoMode) {
+      setProjects(PROJECTS);
+      setThreads(THREADS);
+      setNotifications(NOTIFICATIONS);
+      setDeveloperAccount(NEW_DEVELOPER_ACCOUNT);
+      setPostingFeesPaid(0);
+      setError(null);
+      setHydrated(true);
+      return;
+    }
+    if (isSupabaseConfigured && !auth.userId) {
+      setProjects([]);
+      setThreads([]);
+      setNotifications([]);
+      setHydrated(false);
+    }
+  }, [auth.demoMode, auth.userId]);
+
   const refresh = useCallback(async () => {
     if (!live || !auth.userId) return;
     setLoading(true);
@@ -874,10 +893,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // With a backend, a buyer only ever sees requirements they own.
   const myProjects = useMemo(
     () =>
-      isSupabaseConfigured
+      isSupabaseConfigured && !auth.demoMode
         ? projects.filter((project) => project.ownedByMe)
         : projects,
-    [projects]
+    [projects, auth.demoMode]
   );
 
   const value = useMemo(
@@ -886,7 +905,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       name: auth.displayName,
       email: auth.email,
       userId: auth.userId,
-      connected: isSupabaseConfigured,
+      connected: isSupabaseConfigured && !auth.demoMode,
       loading,
       hydrated,
       error,
@@ -926,6 +945,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       auth.displayName,
       auth.email,
       auth.userId,
+      auth.demoMode,
       auth.signOut,
       loading,
       hydrated,

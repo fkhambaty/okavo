@@ -107,7 +107,9 @@ export default function AppShell() {
           <span />
         </button>
         <Logo size={20} />
-        <span className="mobile-bar-role">{workspaceLabel}</span>
+        <span className="mobile-bar-role">
+          {connected ? workspaceLabel : "Demo data"}
+        </span>
       </header>
 
       {navOpen && (

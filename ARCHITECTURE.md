@@ -72,6 +72,7 @@ Fees and copy that quote money live in `apps/catalog/src/lib/pricing.ts`. Change
 - `npm run rls` refuses production. Destructive seeds refuse production unless `OKAVO_ALLOW_PRODUCTION_DESTRUCTIVE=1`.
 - The service-role key can read identity documents and payments. It belongs in `.okavo-agent`, never in git or in a chat log.
 - Sessions must stay on the Vercel auth receptionist. Do not put the session back in `localStorage`.
+- Test login `dummy` / `dummy` opens an isolated buyer demo in memory. It never creates a Supabase session, reads live rows, or grants developer/admin access; the workspace must label it `Demo data`.
 - On 12 Oct 2026 the auth health URL for this project did not return a healthy response. Treat "the site is up" and "the database is up" as two different facts.
 
 Two database rules are the product:

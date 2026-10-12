@@ -62,6 +62,7 @@ async function notifySupportOfSignup(details: {
 type AuthValue = {
   ready: boolean;
   connected: boolean;
+  demoMode: boolean;
   userId: string | null;
   email: string | null;
   role: Role;
@@ -92,6 +93,7 @@ const SCALE_TO_DB: Record<BuyerScale, string> = {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(!isSupabaseConfigured);
   const [session, setSession] = useState<Session | null>(null);
+  const [demoMode, setDemoMode] = useState(false);
   const [role, setRole] = useState<Role>("guest");
   const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -178,6 +180,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onMemorySessionChange((nextSession) => {
       setSession(nextSession);
       if (nextSession) {
+        setDemoMode(false);
         void ensureProfile(nextSession);
       } else {
         setRole("guest");
@@ -303,12 +306,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
     await receptionistSignOut();
     setSession(null);
+    setDemoMode(false);
     setRole("guest");
     setDisplayName("");
   }, []);
 
   const demoSignIn = useCallback(
     (nextRole: Exclude<Role, "guest">, name: string) => {
+      setDemoMode(true);
       setRole(nextRole);
       setDisplayName(name);
     },
@@ -324,6 +329,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       ready,
       connected: isSupabaseConfigured,
+      demoMode,
       userId: session?.user.id ?? null,
       email: session?.user.email ?? null,
       role,
@@ -346,6 +352,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [
       ready,
       session,
+      demoMode,
       role,
       displayName,
       error,

@@ -88,6 +88,15 @@ export default function SignIn() {
       setBusy(false);
       return;
     }
+    if (
+      mode === "signin" &&
+      email.trim().toLowerCase() === "dummy" &&
+      password === "dummy"
+    ) {
+      auth.demoSignIn("buyer", "Dummy Buyer");
+      setBusy(false);
+      return;
+    }
     if (!auth.connected) {
       auth.demoSignIn(
         role,
