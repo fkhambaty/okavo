@@ -1,5 +1,6 @@
 import { logAudit } from "./audit";
-import { backend } from "./backend";
+import { apiBase, backend } from "./backend";
+import { getAccessToken } from "./sessionClient";
 import { checkGuardrails } from "./guardrails";
 import type {
   AppNotification,
@@ -579,11 +580,54 @@ export type IdentitySubmission = {
   selfie: File | null;
 };
 
+const MAX_PRIVATE_FILE = 5 * 1024 * 1024;
+
+async function filePayload(file: File) {
+  if (file.size > MAX_PRIVATE_FILE) {
+    throw new Error("Files must be 5 MB or smaller.");
+  }
+  const data = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      const comma = result.indexOf(",");
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = () => reject(new Error("Could not read that file."));
+    reader.readAsDataURL(file);
+  });
+  return { mime: file.type || "application/octet-stream", name: file.name, data };
+}
+
+async function privateFileUrl(path: string): Promise<string> {
+  if (!path || path === "[purged]") {
+    throw new Error("This file has been deleted after the retention window.");
+  }
+  const base = apiBase();
+  if (!base) throw new Error("Okavo API is not configured");
+  const token = await getAccessToken();
+  const response = await fetch(`${base}/v1/files/${encodeURIComponent(path)}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(payload.error || "Could not open that file.");
+  }
+  return URL.createObjectURL(await response.blob());
+}
+
 export async function submitIdentity(
   _profileId: string,
-  _input: IdentitySubmission
+  input: IdentitySubmission
 ) {
-  await backend("/v1/identity", { body: { unavailable: true } });
+  await backend("/v1/identity", {
+    body: {
+      document_type: input.documentType,
+      document_country: input.documentCountry,
+      document: await filePayload(input.document),
+      selfie: input.selfie ? await filePayload(input.selfie) : null,
+    },
+  });
 }
 
 export async function submitInterview(_profileId: string) {
@@ -612,10 +656,8 @@ export async function fetchExternalPaymentProofs(
   }));
 }
 
-export async function signedPaymentProofUrl(_path: string): Promise<string> {
-  throw new Error(
-    "Payment proof files are not stored on this backend. The reference is still on the payment."
-  );
+export async function signedPaymentProofUrl(path: string): Promise<string> {
+  return privateFileUrl(path);
 }
 
 export async function fundMilestone(
@@ -624,13 +666,11 @@ export async function fundMilestone(
   proof?: File | null,
   _profileId?: string
 ) {
-  if (proof) {
-    throw new Error(
-      "Payment proof files are not stored on this backend. Record the payment reference without a file."
-    );
-  }
   await backend(`/v1/milestones/${milestoneId}/fund`, {
-    body: { reference: reference?.trim() || null },
+    body: {
+      reference: reference?.trim() || null,
+      proof: proof ? await filePayload(proof) : null,
+    },
   });
   logAudit("milestone.fund", "milestone", milestoneId);
 }
@@ -879,10 +919,8 @@ export async function fetchVerificationQueue(): Promise<ReviewItem[]> {
   }));
 }
 
-export async function signedDocumentUrl(_path: string): Promise<string> {
-  throw new Error(
-    "Identity document storage is not configured. Nothing can be opened."
-  );
+export async function signedDocumentUrl(path: string): Promise<string> {
+  return privateFileUrl(path);
 }
 
 export async function decideVerification(

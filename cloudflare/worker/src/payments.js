@@ -1,6 +1,19 @@
 import { consumeRateLimit } from "./auth.js";
 import { HttpError } from "./http.js";
-import { hmacHex, hireFeePaise, nowIso, paymentsLive, sha256, timingSafeEqual, fixedFee, CHARGE_CURRENCY } from "./pure.js";
+import {
+  hmacHex,
+  hireFeePaise,
+  nowIso,
+  paymentsLive,
+  sha256,
+  timingSafeEqual,
+  fixedFee,
+  CHARGE_CURRENCY,
+  checkoutMode,
+  paymentLinkSignatureMessage,
+} from "./pure.js";
+
+const CALLBACK_URL = "https://okavo.org/app/payments/return";
 
 const NOT_CHARGED =
   "Payments are temporarily unavailable while the payment account is being verified. You have not been charged.";
@@ -30,7 +43,11 @@ export async function settlePayment(db, input) {
   }
   if (row.status !== "pending") throw new HttpError(409, "Payment is not pending");
   if (row.provider !== input.provider) throw new HttpError(400, "Payment provider mismatch");
-  if (row.provider_order_id !== input.orderId) throw new HttpError(400, "Payment order mismatch");
+  const storedOrder = row.provider_order_id || "";
+  const linkOk = Boolean(input.linkId && row.provider_link_id === input.linkId);
+  if ((storedOrder && storedOrder !== input.orderId && !linkOk) || !input.orderId) {
+    throw new HttpError(400, "Payment order mismatch");
+  }
   if (Number(row.amount_cents) !== Number(input.amountCents) || String(row.currency).toUpperCase() !== String(input.currency).toUpperCase()) {
     await ops(db, "Provider payment amount or currency did not match the order", row.id, {
       expected_amount: row.amount_cents,
@@ -45,10 +62,10 @@ export async function settlePayment(db, input) {
     .prepare(
       `UPDATE payments
           SET status = 'paid', paid_at = COALESCE(paid_at, ?), provider_payment_id = ?,
-              provider_reference = ?, updated_at = ?
+              provider_reference = ?, provider_order_id = COALESCE(provider_order_id, ?), updated_at = ?
         WHERE id = ? AND status = 'pending'`,
     )
-    .bind(now, input.providerPaymentId, input.providerPaymentId, now, row.id)
+    .bind(now, input.providerPaymentId, input.providerPaymentId, input.orderId, now, row.id)
     .run();
   if (row.purpose === "bidding_membership") {
     await db
@@ -115,18 +132,23 @@ export async function createOrder(db, env, request, user, body) {
     }
   }
 
+  const hosted = checkoutMode(env) === "hosted";
   const since = new Date(Date.now() - 15 * 60 * 1000).toISOString();
   const reusable = await db
     .prepare(
-      `SELECT id, provider_order_id, amount_cents, currency FROM payments
+      `SELECT id, provider_order_id, provider_link_id, provider_link_url, amount_cents, currency FROM payments
         WHERE profile_id = ? AND purpose = ? AND status = 'pending' AND created_at >= ?
           AND ((? IS NULL AND bid_id IS NULL) OR bid_id = ?)
         ORDER BY created_at DESC LIMIT 1`,
     )
     .bind(user.id, purpose, since, bidId, bidId)
     .first();
-  if (reusable?.provider_order_id) {
+  if (hosted && reusable?.provider_link_url) {
+    return hostedPayload(env, reusable, label);
+  }
+  if (!hosted && reusable?.provider_order_id && !reusable.provider_link_id) {
     return {
+      checkout: "modal",
       orderId: reusable.provider_order_id,
       amount: reusable.amount_cents,
       currency: reusable.currency,
@@ -149,27 +171,43 @@ export async function createOrder(db, env, request, user, body) {
     .bind(paymentId, user.id, purpose, amount, CHARGE_CURRENCY, projectId, bidId, now, now)
     .run();
 
-  const auth = btoa(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`);
-  const orderResponse = await fetch("https://api.razorpay.com/v1/orders", {
-    method: "POST",
-    headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      amount,
-      currency: CHARGE_CURRENCY,
-      receipt: paymentId,
-      notes: { payment_id: paymentId, purpose },
-    }),
+  if (hosted) {
+    try {
+      const link = await createPaymentLink(env, {
+        paymentId,
+        amount,
+        label,
+        name: user.full_name,
+        email: user.email,
+      });
+      await db
+        .prepare("UPDATE payments SET provider_link_id = ?, provider_link_url = ?, updated_at = ? WHERE id = ?")
+        .bind(link.id, link.short_url, nowIso(), paymentId)
+        .run();
+      return hostedPayload(env, { id: paymentId, amount_cents: amount, currency: CHARGE_CURRENCY, provider_link_url: link.short_url, provider_link_id: link.id }, label);
+    } catch (error) {
+      await db.prepare("DELETE FROM payments WHERE id = ? AND provider_order_id IS NULL AND provider_link_id IS NULL").bind(paymentId).run();
+      if (error instanceof HttpError) throw error;
+      throw new HttpError(502, "Payment could not be started. You have not been charged.");
+    }
+  }
+
+  const orderBody = await razorpay(env, "/v1/orders", {
+    amount,
+    currency: CHARGE_CURRENCY,
+    receipt: paymentId,
+    notes: { payment_id: paymentId, purpose, product: "okavo" },
   });
-  const orderBody = await orderResponse.json().catch(() => ({}));
-  if (!orderResponse.ok || !orderBody.id) {
+  if (!orderBody.id) {
     await db.prepare("DELETE FROM payments WHERE id = ? AND provider_order_id IS NULL").bind(paymentId).run();
-    throw new HttpError(502, "Payment could not be started. You have not been charged.");
+    throw new HttpError(502, providerFailure(orderBody));
   }
   await db
     .prepare("UPDATE payments SET provider_order_id = ?, updated_at = ? WHERE id = ?")
     .bind(orderBody.id, nowIso(), paymentId)
     .run();
   return {
+    checkout: "modal",
     orderId: orderBody.id,
     amount,
     currency: CHARGE_CURRENCY,
@@ -177,6 +215,132 @@ export async function createOrder(db, env, request, user, body) {
     paymentId,
     keyId: env.RAZORPAY_KEY_ID,
   };
+}
+
+function hostedPayload(env, row, label) {
+  return {
+    checkout: "hosted",
+    shortUrl: row.provider_link_url,
+    orderId: row.provider_link_id || row.provider_order_id || "",
+    amount: row.amount_cents,
+    currency: row.currency,
+    label,
+    paymentId: row.id,
+    keyId: env.RAZORPAY_KEY_ID,
+  };
+}
+
+function providerFailure(body) {
+  const description = String(body?.error?.description || "").replace(/\s+/g, " ").trim().slice(0, 180);
+  if (!description || /key_|secret|rzp_live|rzp_test/i.test(description)) {
+    return "Payment could not be started. You have not been charged.";
+  }
+  return `Payment could not be started. You have not been charged. ${description}`;
+}
+
+async function razorpay(env, path, body, method = "POST") {
+  const auth = btoa(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`);
+  const response = await fetch(`https://api.razorpay.com${path}`, {
+    method,
+    headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new HttpError(502, providerFailure(payload));
+    error.provider = payload;
+    throw error;
+  }
+  return payload;
+}
+
+async function createPaymentLink(env, { paymentId, amount, label, name, email }) {
+  const description = `FKTech — ${label}`.slice(0, 255);
+  return razorpay(env, "/v1/payment_links", {
+    amount,
+    currency: CHARGE_CURRENCY,
+    accept_partial: false,
+    reference_id: paymentId,
+    description,
+    customer: {
+      name: String(name || "Okavo customer").slice(0, 80),
+      email: String(email || "").slice(0, 120),
+    },
+    notify: { sms: false, email: false },
+    reminder_enable: false,
+    callback_url: CALLBACK_URL,
+    callback_method: "get",
+    notes: { payment_id: paymentId, product: "okavo" },
+  });
+}
+
+export async function createHostedLink(db, env, user, body) {
+  requireUser(user);
+  if (!paymentsLive(env)) throw new HttpError(503, NOT_CHARGED);
+  const paymentId = String(body?.payment_id || "").trim();
+  const row = await db.prepare("SELECT * FROM payments WHERE id = ?").bind(paymentId).first();
+  if (!row || row.profile_id !== user.id) throw new HttpError(404, "Payment not found");
+  if (row.status === "paid") return { checkout: "hosted", alreadyPaid: true, paymentId, shortUrl: row.provider_link_url || null };
+  if (row.status !== "pending") throw new HttpError(409, "Payment is not pending");
+  if (row.provider_link_url) return hostedPayload(env, row, "Okavo fee");
+  const link = await createPaymentLink(env, {
+    paymentId,
+    amount: row.amount_cents,
+    label: row.purpose === "bidding_membership" ? "Okavo bidding membership" : row.purpose === "platform_fee" ? "Okavo hire success fee" : "Okavo requirement posting fee",
+    name: user.full_name,
+    email: user.email,
+  });
+  await db
+    .prepare("UPDATE payments SET provider_link_id = ?, provider_link_url = ?, updated_at = ? WHERE id = ?")
+    .bind(link.id, link.short_url, nowIso(), paymentId)
+    .run();
+  return hostedPayload(env, { ...row, provider_link_id: link.id, provider_link_url: link.short_url }, "Okavo fee");
+}
+
+async function capturedPayment(env, paymentId) {
+  const remote = await razorpay(env, `/v1/payments/${encodeURIComponent(paymentId)}`, null, "GET");
+  return remote;
+}
+
+export async function confirmPaymentLink(db, env, user, body) {
+  requireUser(user);
+  if (!env.RAZORPAY_KEY_SECRET) throw new HttpError(503, NOT_CHARGED);
+  const linkId = String(body?.razorpay_payment_link_id || "").trim();
+  const referenceId = String(body?.razorpay_payment_link_reference_id || "").trim();
+  const status = String(body?.razorpay_payment_link_status || "").trim();
+  const razorpayPaymentId = String(body?.razorpay_payment_id || "").trim();
+  const signature = String(body?.razorpay_signature || "").trim();
+  if (!linkId || !referenceId || !status || !razorpayPaymentId || !signature) {
+    throw new HttpError(400, "Payment link return is missing required fields");
+  }
+  const expected = await hmacHex(
+    env.RAZORPAY_KEY_SECRET,
+    paymentLinkSignatureMessage({ linkId, referenceId, status, paymentId: razorpayPaymentId }),
+  );
+  if (!timingSafeEqual(expected, signature)) throw new HttpError(400, "Invalid payment link signature");
+  const record = await db.prepare("SELECT * FROM payments WHERE id = ?").bind(referenceId).first();
+  if (!record) throw new HttpError(404, "Payment not found");
+  if (record.profile_id !== user.id) throw new HttpError(403, "This payment does not belong to you");
+  if (record.provider_link_id && record.provider_link_id !== linkId) throw new HttpError(400, "Payment link mismatch");
+  if (status !== "paid") return { ok: false, status, purpose: record.purpose };
+  if (record.status === "paid") return { ok: true, alreadyPaid: true, purpose: record.purpose, project_id: record.project_id };
+  const remote = await capturedPayment(env, razorpayPaymentId);
+  if (String(remote.status || "") !== "captured") {
+    throw new HttpError(409, `Payment is ${remote.status || "unknown"}, not captured`);
+  }
+  const noted = remote.notes?.payment_id ? String(remote.notes.payment_id) : "";
+  if (noted && noted !== record.id) throw new HttpError(400, "Payment notes do not match this order");
+  const result = await settlePayment(db, {
+    paymentId: record.id,
+    provider: "razorpay",
+    orderId: String(remote.order_id || ""),
+    linkId,
+    providerPaymentId: razorpayPaymentId,
+    amountCents: Number(remote.amount),
+    currency: String(remote.currency || ""),
+  });
+  if (result === "mismatch") throw new HttpError(409, "Payment amount did not match the order. You have not been marked paid.");
+  return { ok: result === "settled" || result === "already_paid", alreadyPaid: result === "already_paid", purpose: record.purpose, project_id: record.project_id };
 }
 
 export async function confirmOrder(db, env, user, body) {
@@ -267,14 +431,36 @@ export async function webhook(db, env, request, raw) {
       .run();
   };
 
-  if (!paymentsLive(env) || type !== "payment.captured" || !orderId || !providerPaymentId || !payment) {
+  let settledPayment = payment;
+  let settledOrderId = orderId;
+  let settledPaymentId = providerPaymentId;
+  let linkId = null;
+  if (type === "payment_link.paid") {
+    const resolved = await paymentFromLinkEvent(env, event);
+    linkId = resolved.link?.id ? String(resolved.link.id) : null;
+    settledPayment = resolved.payment;
+    settledPaymentId = settledPayment?.id ? String(settledPayment.id) : null;
+    settledOrderId = settledPayment?.order_id ? String(settledPayment.order_id) : resolved.link?.order_id ? String(resolved.link.order_id) : null;
+  }
+
+  const supported = type === "payment.captured" || type === "payment_link.paid";
+  if (!paymentsLive(env) || !supported || !settledOrderId || !settledPaymentId || !settledPayment) {
     await ignore("ignored");
     return { received: true, settled: false };
   }
-  const notes = payment.notes || {};
+  if (String(settledPayment.status || "captured") !== "captured" && type === "payment_link.paid") {
+    await ignore("ignored");
+    return { received: true, settled: false };
+  }
+  const notes = settledPayment.notes || event.payload?.payment_link?.entity?.notes || {};
+  const referenceId = event.payload?.payment_link?.entity?.reference_id;
   const local = notes.payment_id
     ? await db.prepare("SELECT * FROM payments WHERE id = ?").bind(String(notes.payment_id)).first()
-    : await db.prepare("SELECT * FROM payments WHERE provider_order_id = ?").bind(orderId).first();
+    : referenceId
+      ? await db.prepare("SELECT * FROM payments WHERE id = ?").bind(String(referenceId)).first()
+      : linkId
+        ? await db.prepare("SELECT * FROM payments WHERE provider_link_id = ?").bind(linkId).first()
+        : await db.prepare("SELECT * FROM payments WHERE provider_order_id = ?").bind(settledOrderId).first();
   if (!local) {
     await ignore("ignored");
     return { received: true, note: "Unknown payment" };
@@ -282,16 +468,37 @@ export async function webhook(db, env, request, raw) {
   const result = await settlePayment(db, {
     paymentId: local.id,
     provider: "razorpay",
-    orderId,
-    providerPaymentId,
-    amountCents: Number(payment.amount),
-    currency: String(payment.currency || ""),
+    orderId: settledOrderId,
+    linkId,
+    providerPaymentId: settledPaymentId,
+    amountCents: Number(settledPayment.amount),
+    currency: String(settledPayment.currency || ""),
   });
   await db
     .prepare("UPDATE payment_provider_events SET payment_id = ?, status = ?, processed_at = ? WHERE id = ?")
     .bind(local.id, result === "mismatch" ? "failed" : "processed", nowIso(), ledgerId)
     .run();
   return { received: true, result };
+}
+
+async function paymentFromLinkEvent(env, event) {
+  const link = event.payload?.payment_link?.entity || null;
+  let payment = event.payload?.payment?.entity || null;
+  if (payment?.id) return { link, payment };
+  if (!link?.id) return { link, payment: null };
+  let orderId = link.order_id || event.payload?.order?.entity?.id || null;
+  try {
+    if (!orderId) {
+      const remote = await razorpay(env, `/v1/payment_links/${encodeURIComponent(link.id)}`, null, "GET");
+      orderId = remote.order_id || null;
+    }
+    if (!orderId) return { link, payment: null };
+    const list = await razorpay(env, `/v1/orders/${encodeURIComponent(orderId)}/payments`, null, "GET");
+    payment = (list.items || []).find((item) => item.status === "captured") || null;
+  } catch {
+    payment = null;
+  }
+  return { link, payment };
 }
 
 export async function paymentStatus(db, user, paymentId) {

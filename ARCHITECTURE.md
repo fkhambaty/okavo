@@ -16,13 +16,50 @@ Browser
   → D1 database okavo
 ```
 
-These routes are intentionally unimplemented and return an error instead of invented data:
+These routes stay unimplemented and return an error instead of invented data:
 
-- Identity document and payment-proof file storage (no object bucket is configured).
-- Starting, scoring, or deciding a build exam. The exam queue is empty and starts are paused.
 - Requirement-assist language models. The page keeps the local heuristic only.
-- Stripe checkout, the Razorpay reconcile cron, and the identity-retention sweep.
+- Stripe checkout and the old Razorpay reconcile cron.
 - Passwordless operator tokens. `scripts/okavo.mjs` database commands no longer talk to Supabase.
+
+Private files, build exams, owner admin promotion, and hosted checkout are live. See the sections below.
+
+## Private files
+
+Cloudflare R2 is not enabled on this account (API error 10042). Identity documents and milestone payment proofs are stored in D1, not in a public bucket.
+
+- Tables: `files` and `file_chunks` in `cloudflare/d1/0002_files_exams_checkout.sql`. Each chunk is about 512 KB of base64.
+- Limit: 5 MB. Types: JPEG, PNG, WebP, PDF. The Worker checks the file header, not only the browser’s MIME label. Selfies cannot be PDFs.
+- Download: `GET /v1/files/:id` with the caller’s bearer token. The owner can open their own file. An admin can open any file. For a payment proof, the other party on that contract can open it too. There is no public URL.
+- Identity retention: 90 days after an admin approves or rejects, the Worker deletes the chunks and replaces the path with `[purged]`. The operations health check runs that purge. Payment proofs are kept with the payment record.
+
+## Build exams
+
+`POST /v1/exams/start` assigns the least-used brief from `exam_briefs`, opens a 5-hour window, and caps starts at 10 per UTC day. Submit takes a public GitHub or GitLab URL and a public HTTPS live URL. `POST /v1/exams/:id/score` runs the local heuristic (URL shape, reachability, duplicate repository). It does not call an LLM. A score of 70 or higher can auto-approve after 48 hours unless an admin paused auto-approval or placed a hold. Admin review is `/app/exams`. Bidding is refused until `interview_status` is `approved`.
+
+Exam starts are on. An admin can pause new starts or auto-approval from that page.
+
+## Admin promotion
+
+`fakhruddinkhambaty@gmail.com` and `fktiindia@gmail.com` receive `role = admin` when they sign up, when they verify the email code, and when they log in. The Worker does not create those accounts or invent a password. Extra addresses can be added with the `ADMIN_EMAILS` Worker variable; the two owner addresses stay included. The admin queue is `/app/verifications` (identity), `/app/exams`, and the contract page for payment proofs.
+
+## Hosted checkout
+
+`CHECKOUT_MODE` defaults to `hosted` because okavo.org is not yet an approved website on the FKTech Razorpay account. In that mode the Worker creates a Razorpay Payment Link (`POST /v1/payment_links`) and the browser goes to Razorpay’s `short_url`. The description is `FKTech — <Okavo label>`. Notes are `{ payment_id, product: "okavo" }`. Notify is off. The callback is `https://okavo.org/app/payments/return`.
+
+On return, the page posts the query string to `POST /v1/payments/razorpay/link-return`. The Worker checks `HMAC_SHA256(key_secret, payment_link_id|payment_link_reference_id|payment_link_status|razorpay_payment_id)`, fetches the payment, and settles only when the amount and currency match. The webhook event `payment_link.paid` is a backup, as is `payment.captured`.
+
+If `CHECKOUT_MODE` is `modal`, Standard Checkout opens first. A website/domain-mismatch `payment.failed`, or a modal that never renders, falls back to the same Payment Link.
+
+To use the modal after Razorpay approves okavo.org, set the Worker variable and redeploy:
+
+```bash
+# in cloudflare/worker/wrangler.toml
+CHECKOUT_MODE = "modal"
+npx wrangler deploy
+```
+
+Leave it `hosted` until that approval is confirmed. Dummy login (`dummy` / `dummy`) still never calls the Worker or Razorpay.
 
 Older sections below that name Supabase describe the system as it was on 12 October 2026.
 

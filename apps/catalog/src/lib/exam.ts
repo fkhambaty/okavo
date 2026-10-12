@@ -56,8 +56,44 @@ export type BuildExam = {
   brief?: ExamBrief | null;
 };
 
-function unavailable(message: string): never {
-  throw new Error(message);
+function mapExam(row: Record<string, unknown> | null): BuildExam | null {
+  if (!row) return null;
+  const brief = row.brief as Record<string, unknown> | null;
+  return {
+    id: String(row.id),
+    status: row.status as BuildExamStatus,
+    briefId: String(row.brief_id),
+    startedAt: String(row.started_at),
+    dueAt: String(row.due_at),
+    submittedAt: (row.submitted_at as string | null) ?? null,
+    githubUrl: (row.github_url as string | null) ?? null,
+    liveUrl: (row.live_url as string | null) ?? null,
+    autoScoreOverall:
+      row.auto_score_overall === null || row.auto_score_overall === undefined
+        ? null
+        : Number(row.auto_score_overall),
+    autoScoreDetail: (row.auto_score_detail as Record<string, unknown>) ?? {},
+    adminQuestion: (row.admin_question as string | null) ?? null,
+    developerReply: (row.developer_reply as string | null) ?? null,
+    reviewerNotes: (row.reviewer_notes as string | null) ?? null,
+    reviewDeadlineAt: (row.review_deadline_at as string | null) ?? null,
+    autoApprovedAt: (row.auto_approved_at as string | null) ?? null,
+    autoApprovalHold: Boolean(row.auto_approval_hold),
+    autoApprovalHoldReason: (row.auto_approval_hold_reason as string | null) ?? null,
+    normalizedRepoUrl: (row.normalized_repo_url as string | null) ?? null,
+    duplicateRepo: Boolean(row.duplicate_repo),
+    duplicateOfExamId: (row.duplicate_of_exam_id as string | null) ?? null,
+    brief: brief
+      ? {
+          id: String(brief.id),
+          slug: String(brief.slug),
+          title: String(brief.title),
+          summary: String(brief.summary),
+          acceptance: String(brief.acceptance),
+          stackHint: String(brief.stack_hint),
+        }
+      : null,
+  };
 }
 
 export async function processExamAutoApprovals() {
@@ -76,64 +112,70 @@ export async function fetchExamControls(): Promise<ExamControls> {
 }
 
 export async function startBuildExam() {
-  unavailable(
-    "Build exams are paused on this backend. No exam was started and nothing was charged."
-  );
+  await backend("/v1/exams/start", { body: {} });
 }
 
 export async function submitBuildExam(
-  _examId: string,
-  _githubUrl: string,
-  _liveUrl: string
+  examId: string,
+  githubUrl: string,
+  liveUrl: string
 ) {
-  unavailable("Build exam submission is not available on this backend.");
+  await backend(`/v1/exams/${examId}/submit`, {
+    body: { github_url: githubUrl, live_url: liveUrl },
+  });
 }
 
-export async function replyBuildExam(_examId: string, _reply: string) {
-  unavailable("Build exam replies are not available on this backend.");
+export async function replyBuildExam(examId: string, reply: string) {
+  await backend(`/v1/exams/${examId}/reply`, { body: { reply } });
 }
 
 export async function fetchMyBuildExam(): Promise<BuildExam | null> {
   if (!isBackendConfigured) return null;
-  const { exam } = await backend<{ exam: null }>("/v1/exams/mine");
-  return exam;
+  const { exam } = await backend<{ exam: Record<string, unknown> | null }>(
+    "/v1/exams/mine"
+  );
+  return mapExam(exam);
 }
 
 export async function listOpenBuildExams(): Promise<BuildExam[]> {
   if (!isBackendConfigured) return [];
-  const { exams } = await backend<{ exams: BuildExam[] }>("/v1/exams/open");
-  return exams ?? [];
+  const { exams } = await backend<{ exams: Record<string, unknown>[] }>(
+    "/v1/exams/open"
+  );
+  return (exams ?? []).map((row) => mapExam(row)).filter((row): row is BuildExam => Boolean(row));
 }
 
-export async function adminAskExam(_examId: string, _question: string) {
-  unavailable("Build exam questions are not available on this backend.");
+export async function adminAskExam(examId: string, question: string) {
+  await backend(`/v1/exams/${examId}/ask`, { body: { question } });
 }
 
 export async function adminDecideExam(
-  _examId: string,
-  _approve: boolean,
-  _notes?: string
+  examId: string,
+  approve: boolean,
+  notes?: string
 ) {
-  unavailable("Build exam decisions are not available on this backend.");
+  await backend(`/v1/exams/${examId}/decide`, { body: { approve, notes } });
 }
 
 export async function adminSetExamPauses(
-  _startsPaused: boolean,
-  _autoApprovePaused: boolean
+  startsPaused: boolean,
+  autoApprovePaused: boolean
 ) {
-  unavailable("Build exam controls are paused on this backend.");
+  await backend("/v1/exams/controls", {
+    body: { starts_paused: startsPaused, auto_approve_paused: autoApprovePaused },
+  });
 }
 
 export async function adminSetExamHold(
-  _examId: string,
-  _hold: boolean,
-  _reason?: string
+  examId: string,
+  hold: boolean,
+  reason?: string
 ) {
-  unavailable("Build exam holds are not available on this backend.");
+  await backend(`/v1/exams/${examId}/hold`, { body: { hold, reason } });
 }
 
-export async function requestExamAnalysis(_examId: string, _accessToken: string) {
-  return null;
+export async function requestExamAnalysis(examId: string, _accessToken: string) {
+  return backend(`/v1/exams/${examId}/score`, { body: {} });
 }
 
 /** Display INR paise for 10% hire fee from bid USD cents ($1 → ₹99). */

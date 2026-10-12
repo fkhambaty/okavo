@@ -316,7 +316,19 @@ export default function Verification() {
                 </div>
               )}
 
-              {!exam && developerAccount.interviewStatus !== "approved" && (
+              {(exam?.status === "rejected" || exam?.status === "expired") && (
+                <div className="callout callout-warn" style={{ marginBottom: "1rem" }}>
+                  <span>!</span>
+                  <span>
+                    {exam.status === "expired"
+                      ? "That exam window ended. Start a new one when you can focus for five hours."
+                      : `The last exam was not accepted${exam.reviewerNotes ? `: ${exam.reviewerNotes}` : "."} You can start another.`}
+                  </span>
+                </div>
+              )}
+
+              {(!exam || exam.status === "rejected" || exam.status === "expired") &&
+                developerAccount.interviewStatus !== "approved" && (
                 <>
                   <p style={{ color: "var(--body)" }}>
                     Start only when you can focus for up to five hours. Leaving

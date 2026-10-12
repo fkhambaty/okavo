@@ -1,6 +1,22 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { hireFeePaise, hmacHex, paymentsLive, POSTING_FEE_PAISE, timingSafeEqual } from "../src/pure.js";
+import {
+  FILE_CHUNK_CHARS,
+  FILE_MAX_BYTES,
+  base64ByteLength,
+  checkoutMode,
+  chunkText,
+  examHeuristicScore,
+  hireFeePaise,
+  hmacHex,
+  normalizeExamRepoUrl,
+  ownerEmailSet,
+  paymentLinkSignatureMessage,
+  paymentsLive,
+  POSTING_FEE_PAISE,
+  sniffMime,
+  timingSafeEqual,
+} from "../src/pure.js";
 
 test("hire fee is chosen by the server from the bid, with a ₹99 floor", () => {
   assert.equal(hireFeePaise(100), 9900);
@@ -18,6 +34,48 @@ test("live Razorpay charges stay off unless explicitly enabled with a real key i
 
 test("posting fee constant matches the displayed INR charge", () => {
   assert.equal(POSTING_FEE_PAISE, 9900);
+});
+
+test("owner emails are always admins and hosted checkout is the default", () => {
+  const owners = ownerEmailSet({});
+  assert.equal(owners.has("fakhruddinkhambaty@gmail.com"), true);
+  assert.equal(owners.has("fktiindia@gmail.com"), true);
+  assert.equal(owners.has("other@example.com"), false);
+  assert.equal(ownerEmailSet({ ADMIN_EMAILS: "extra@example.com" }).has("extra@example.com"), true);
+  assert.equal(checkoutMode({}), "hosted");
+  assert.equal(checkoutMode({ CHECKOUT_MODE: "modal" }), "modal");
+  assert.equal(checkoutMode({ CHECKOUT_MODE: "hosted" }), "hosted");
+});
+
+test("payment link signatures use Razorpay's field order", () => {
+  assert.equal(
+    paymentLinkSignatureMessage({
+      linkId: "plink_1",
+      referenceId: "pay-1",
+      status: "paid",
+      paymentId: "pay_1",
+    }),
+    "plink_1|pay-1|paid|pay_1",
+  );
+});
+
+test("private files stay within a 5 MB cap and 512 KB chunks", () => {
+  assert.equal(FILE_MAX_BYTES, 5 * 1024 * 1024);
+  assert.equal(FILE_CHUNK_CHARS, 512 * 1024);
+  assert.deepEqual(chunkText("abcdefghij", 4), ["abcd", "efgh", "ij"]);
+  assert.equal(base64ByteLength("YQ=="), 1);
+  assert.equal(sniffMime(Uint8Array.from([0xff, 0xd8, 0xff, 0x00])), "image/jpeg");
+  assert.equal(sniffMime(Uint8Array.from([0x25, 0x50, 0x44, 0x46, 0x2d])), "application/pdf");
+  assert.equal(sniffMime(Uint8Array.from([1, 2, 3, 4])), null);
+});
+
+test("exam heuristic ignores duplicate as a score and normalizes repos", () => {
+  const high = examHeuristicScore({ githubOk: true, liveOk: true, repoOk: true, hostedOk: true, duplicate: true });
+  assert.equal(high.overall, 100);
+  assert.equal(high.checks.find((check) => check.id === "repo_duplicate").pass, false);
+  const low = examHeuristicScore({ githubOk: true, liveOk: false, repoOk: false, hostedOk: true, duplicate: false });
+  assert.equal(low.overall, 50);
+  assert.equal(normalizeExamRepoUrl("https://www.github.com/Okavo/Demo.git?ref=1"), "https://github.com/okavo/demo");
 });
 
 test("webhook signatures reject a mismatched body", async () => {

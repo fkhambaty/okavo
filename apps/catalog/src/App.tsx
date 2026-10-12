@@ -37,6 +37,7 @@ const DeveloperProfile = lazy(() => import("./pages/buyer/DeveloperProfile"));
 const Developers = lazy(() => import("./pages/buyer/Developers"));
 const NewRequirement = lazy(() => import("./pages/buyer/NewRequirement"));
 const Payments = lazy(() => import("./pages/buyer/Payments"));
+const PaymentReturn = lazy(() => import("./pages/PaymentReturn"));
 const DevBids = lazy(() => import("./pages/developer/DevBids"));
 const DevBoard = lazy(() => import("./pages/developer/DevBoard"));
 const DevProject = lazy(() => import("./pages/developer/DevProject"));
@@ -161,6 +162,7 @@ export default function App() {
                 </BuyerOnly>
               }
             />
+            <Route path="payments/return" element={<PaymentReturn />} />
             <Route
               path="payments"
               element={

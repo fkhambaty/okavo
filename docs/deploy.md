@@ -9,6 +9,26 @@ The app is a static single-page build (Vite). The browser calls the Worker with 
 [vercel.json](../vercel.json); `apps/catalog/public/_redirects` covers Netlify
 and Cloudflare Pages.
 
+## Current production (13 October 2026)
+
+| Piece | Where |
+|-------|--------|
+| Site | https://okavo.org — Vercel project `pro-catalog`, root `apps/catalog`. Push to `main` deploys it. |
+| API | Worker `okavo-api` at https://okavo-api.fkhambaty.workers.dev |
+| Database | D1 `okavo` (`3d3afb8e-1749-4c70-8001-e115504e3b03`) |
+| Schema | `cloudflare/d1/0001_okavo.sql`, then `cloudflare/d1/0002_files_exams_checkout.sql` |
+| Checkout | `CHECKOUT_MODE=hosted` in `cloudflare/worker/wrangler.toml`. Payment Links, merchant text `FKTech`. Set the var to `modal` and `npx wrangler deploy` only after Razorpay approves okavo.org. |
+| Files | D1 `files` + `file_chunks`. Not R2. 5 MB, jpeg/png/webp/pdf, private `GET /v1/files/:id`. Identity files are deleted 90 days after the admin decision. |
+| Exams | Worker routes under `/v1/exams`. Local heuristic score, no LLM key. |
+| Admins | `fakhruddinkhambaty@gmail.com` and `fktiindia@gmail.com` become `admin` on signup, verify, and login. Do not insert a password for them. |
+
+Apply a new D1 file and deploy the Worker from `cloudflare/worker` after sourcing `~/.config/fk-products/cloudflare.env` (never print that file):
+
+```bash
+npx --yes wrangler@latest d1 execute okavo --remote --file=../d1/0002_files_exams_checkout.sql
+npx --yes wrangler@latest deploy
+```
+
 The sections below that name Supabase describe the 12 October 2026 deploy path.
 
 ## Environments

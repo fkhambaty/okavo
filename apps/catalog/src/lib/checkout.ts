@@ -127,6 +127,8 @@ export async function collectFee(
   }
 
   let order: {
+    checkout?: "hosted" | "modal";
+    shortUrl?: string;
     orderId: string;
     amount: number;
     currency: string;
@@ -163,14 +165,51 @@ export async function collectFee(
     };
   }
 
-  const ready = await loadCheckout();
-  if (!ready || !window.Razorpay) {
-    return {
-      status: "error",
-      message:
-        "The payment window could not load. Disable any ad blocker for this site and try again.",
-    };
+  async function openHostedCheckout(): Promise<CheckoutResult> {
+    let shortUrl = order.shortUrl;
+    if (!shortUrl) {
+      try {
+        const response = await fetch(`${base}/v1/payments/razorpay/link`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ payment_id: order.paymentId }),
+        });
+        const payload = (await response.json()) as { shortUrl?: string; error?: string; alreadyPaid?: boolean };
+        if (payload.alreadyPaid) return { status: "paid" };
+        if (!response.ok || !payload.shortUrl) {
+          return {
+            status: "error",
+            message: payload.error ?? "The hosted payment page could not be opened. You have not been charged.",
+          };
+        }
+        shortUrl = payload.shortUrl;
+      } catch {
+        return {
+          status: "error",
+          message: "The hosted payment page could not be opened. You have not been charged.",
+        };
+      }
+    }
+    try {
+      sessionStorage.setItem("okavo.checkout.purpose", purpose);
+    } catch {
+      // The return page can still read the purpose from the confirmer.
+    }
+    window.location.assign(shortUrl);
+    return new Promise(() => {});
   }
+
+  function websiteBlocked(text: string) {
+    return /website|domain|not approved|unregistered|merchant website|whitelist|registered website/i.test(text);
+  }
+
+  if (order.checkout === "hosted") return openHostedCheckout();
+
+  const ready = await loadCheckout();
+  if (!ready || !window.Razorpay) return openHostedCheckout();
 
   return new Promise<CheckoutResult>((resolve) => {
     let settled = false;
@@ -206,6 +245,9 @@ export async function collectFee(
         email: buyer?.email ?? "",
       },
       theme: { color: "#e8973a" },
+      modal: {
+        ondismiss: () => finish({ status: "cancelled" }),
+      },
       handler: (response: RazorpaySuccessResponse) => {
         void (async () => {
           const confirmed = await confirmPayment(token, base, {
@@ -236,23 +278,31 @@ export async function collectFee(
           });
         })();
       },
-      modal: {
-        ondismiss: () => finish({ status: "cancelled" }),
-      },
+    });
+
+    const razorpayEvents = checkout as RazorpayInstance & {
+      on?: (event: string, handler: (response: { error?: { code?: string; reason?: string; description?: string } }) => void) => void;
+    };
+    razorpayEvents.on?.("payment.failed", (response) => {
+      const error = response?.error;
+      const text = `${error?.code || ""} ${error?.reason || ""} ${error?.description || ""}`;
+      if (!websiteBlocked(text)) {
+        finish({
+          status: "error",
+          message: error?.description || "Payment failed. You have not been charged.",
+        });
+        return;
+      }
+      void openHostedCheckout().then((result) => finish(result));
     });
 
     checkout.open();
 
     // Razorpay only calls handler/ondismiss once its modal renders. If the
-    // iframe is blocked (CSP, extension, network), neither ever fires and the
-    // caller would wait forever, so surface an actionable error instead.
+    // iframe is blocked, open the hosted Payment Link instead.
     watchdog = setTimeout(() => {
       if (document.querySelector(".razorpay-container")) return;
-      finish({
-        status: "error",
-        message:
-          "The payment window could not open. Disable any ad/script blocker for okavo.org and try again — you have not been charged.",
-      });
+      void openHostedCheckout().then((result) => finish(result));
     }, 6000);
   });
 }

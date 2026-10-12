@@ -1,6 +1,7 @@
 import { consumeRateLimit } from "./auth.js";
+import { deleteFile, purgeExpiredIdentityFiles, setFileExpiry, storePrivateFile } from "./files.js";
 import { HttpError, clampText } from "./http.js";
-import { lockReference, nowIso, sha256, timingSafeEqual } from "./pure.js";
+import { IDENTITY_RETENTION_MS, lockReference, nowIso, sha256, timingSafeEqual } from "./pure.js";
 
 function requireUser(user) {
   if (!user?.email_verified_at) throw new HttpError(401, "Sign in again.");
@@ -358,6 +359,7 @@ export async function placeBid(db, user, projectId, body) {
   if (user.role !== "developer" && !isAdmin(user)) throw new HttpError(403, "Only developers can bid");
   const dev = await db.prepare("SELECT * FROM developer_profiles WHERE profile_id = ?").bind(user.id).first();
   if (!dev || dev.identity_status !== "approved") throw new HttpError(403, "Identity verification must be approved before bidding");
+  if (dev.interview_status !== "approved") throw new HttpError(403, "The build exam must be approved before bidding");
   if (!dev.bidding_unlocked_at) throw new HttpError(403, "Bidding membership payment required before bidding");
   if (dev.blocked_at) throw new HttpError(403, "This developer account cannot bid");
   const project = await projectFor(db, projectId);
@@ -625,24 +627,21 @@ export async function acceptMilestone(db, user, milestoneId) {
   if (contract?.buyer_id !== user.id && !isAdmin(user)) throw new HttpError(403, "Only the buyer can accept this milestone");
   if (milestone.status !== "submitted") throw new HttpError(409, "Milestone must be submitted before it can be accepted");
   const now = nowIso();
-  await db
-    .prepare("UPDATE milestones SET status = 'released', accepted_at = ?, released_at = ? WHERE id = ?")
-    .bind(now, now, milestoneId)
-    .run();
+  await db.prepare("UPDATE milestones SET status = 'accepted', accepted_at = ? WHERE id = ?").bind(now, milestoneId).run();
   await audit(db, user, "milestone.accept", "milestone", milestoneId, {});
   return { ok: true };
 }
 
 export async function fundMilestone(db, user, milestoneId, body) {
   requireUser(user);
-  if (body?.proof) throw new HttpError(501, "Payment proof files are not stored on this backend. Record the reference without a file, or contact support@okavo.org.");
   const milestone = await db.prepare("SELECT * FROM milestones WHERE id = ?").bind(milestoneId).first();
   if (!milestone) throw new HttpError(404, "Milestone not found");
   const contract = await db.prepare("SELECT * FROM contracts WHERE id = ?").bind(milestone.contract_id).first();
   const project = await projectFor(db, contract.project_id);
   if (contract.buyer_id !== user.id) throw new HttpError(403, "Only the buyer can attest payment");
   if (!["hired", "in_delivery", "delivered"].includes(project.stage)) throw new HttpError(409, "Project is not in a payable stage");
-  if (!["released", "accepted"].includes(milestone.status)) {
+  if (milestone.status === "released") return { ok: true };
+  if (milestone.status !== "accepted") {
     throw new HttpError(409, "Accept the work before recording an outside payment");
   }
   const existing = await db
@@ -650,29 +649,53 @@ export async function fundMilestone(db, user, milestoneId, body) {
     .bind(milestoneId)
     .first();
   if (existing) return { ok: true };
+  let proofId = null;
+  if (body?.proof?.data) {
+    const stored = await storePrivateFile(db, {
+      ownerId: user.id,
+      purpose: "payment_proof",
+      mime: body.proof.mime,
+      data: body.proof.data,
+    });
+    proofId = stored.id;
+  }
   const now = nowIso();
+  try {
+    await db
+      .prepare(
+        `INSERT INTO payments (
+           id, profile_id, purpose, status, amount_cents, currency, provider, provider_reference,
+           contract_id, milestone_id, project_id, payer_reference, proof_storage_path, paid_at, created_at, updated_at
+         ) VALUES (?, ?, 'milestone_funding', 'paid', ?, 'USD', 'external', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        crypto.randomUUID(),
+        user.id,
+        milestone.amount_cents,
+        `external:${milestoneId}`,
+        contract.id,
+        milestoneId,
+        project.id,
+        clampText(body?.reference, 160) || null,
+        proofId,
+        now,
+        now,
+        now,
+      )
+      .run();
+  } catch (error) {
+    if (proofId) await deleteFile(db, proofId);
+    throw error;
+  }
   await db
-    .prepare(
-      `INSERT INTO payments (
-         id, profile_id, purpose, status, amount_cents, currency, provider, provider_reference,
-         contract_id, milestone_id, project_id, payer_reference, paid_at, created_at, updated_at
-       ) VALUES (?, ?, 'milestone_funding', 'paid', ?, 'USD', 'external', ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .bind(
-      crypto.randomUUID(),
-      user.id,
-      milestone.amount_cents,
-      `external:${milestoneId}`,
-      contract.id,
-      milestoneId,
-      project.id,
-      clampText(body?.reference, 160) || null,
-      now,
-      now,
-      now,
-    )
+    .prepare("UPDATE milestones SET status = 'released', funded_at = COALESCE(funded_at, ?), released_at = COALESCE(released_at, ?) WHERE id = ?")
+    .bind(now, now, milestoneId)
     .run();
-  await db.prepare("UPDATE milestones SET funded_at = COALESCE(funded_at, ?) WHERE id = ?").bind(now, milestoneId).run();
+  const next = await db
+    .prepare("SELECT id FROM milestones WHERE contract_id = ? AND status = 'pending' ORDER BY position LIMIT 1")
+    .bind(contract.id)
+    .first();
+  if (next) await db.prepare("UPDATE milestones SET status = 'in_progress' WHERE id = ?").bind(next.id).run();
   await notify(db, contract.developer_id, "payment", "Milestone paid", `The buyer confirmed payment for "${milestone.title}" after accepting the work.`, `/app/contract/${project.id}`);
   await audit(db, user, "milestone.fund", "milestone", milestoneId, { mode: "accept_then_pay" });
   return { ok: true };
@@ -946,13 +969,74 @@ export async function submitInterview(db, user) {
   return { ok: true };
 }
 
-export function identityUnavailable() {
-  throw new HttpError(501, "Identity document storage is not configured. Nothing was uploaded and no verification was opened.");
+export async function submitIdentity(db, user, body) {
+  requireUser(user);
+  if (user.role !== "developer") throw new HttpError(403, "Only a developer can submit identity documents");
+  const allowed = await consumeRateLimit(db, await sha256(`identity:${user.id}`), 8, 3600);
+  if (!allowed) throw new HttpError(429, "Too many identity uploads. Try again in an hour.");
+  const dev = await db.prepare("SELECT identity_status FROM developer_profiles WHERE profile_id = ?").bind(user.id).first();
+  if (!dev) throw new HttpError(403, "Developer profile not found");
+  if (dev.identity_status === "approved") throw new HttpError(409, "Identity is already approved");
+  if (dev.identity_status === "submitted") throw new HttpError(409, "Identity documents are already in review");
+  const documentType = clampText(body?.document_type, 80);
+  const country = clampText(body?.document_country, 80);
+  if (!documentType || !country) throw new HttpError(400, "Choose a document type and issuing country");
+  if (!body?.document?.data) throw new HttpError(400, "Upload a photo or PDF of the document");
+  const document = await storePrivateFile(db, {
+    ownerId: user.id,
+    purpose: "identity_document",
+    mime: body.document.mime,
+    data: body.document.data,
+  });
+  let selfieId = null;
+  try {
+    if (body?.selfie?.data) {
+      const selfie = await storePrivateFile(db, {
+        ownerId: user.id,
+        purpose: "identity_selfie",
+        mime: body.selfie.mime,
+        data: body.selfie.data,
+      });
+      selfieId = selfie.id;
+    }
+  } catch (error) {
+    await deleteFile(db, document.id);
+    throw error;
+  }
+  const previous = await db
+    .prepare("SELECT document_storage_path, selfie_storage_path FROM identity_verifications WHERE developer_id = ?")
+    .bind(user.id)
+    .all();
+  for (const row of previous.results || []) {
+    await deleteFile(db, row.document_storage_path);
+    await deleteFile(db, row.selfie_storage_path);
+  }
+  const now = nowIso();
+  const id = crypto.randomUUID();
+  await db
+    .prepare(
+      `INSERT INTO identity_verifications (
+         id, developer_id, status, document_type, document_country, document_storage_path, selfie_storage_path, created_at
+       ) VALUES (?, ?, 'submitted', ?, ?, ?, ?, ?)`,
+    )
+    .bind(id, user.id, documentType, country, document.id, selfieId, now)
+    .run();
+  await db
+    .prepare("UPDATE developer_profiles SET identity_status = 'submitted', updated_at = ? WHERE profile_id = ?")
+    .bind(now, user.id)
+    .run();
+  const admins = await db.prepare("SELECT id FROM profiles WHERE role = 'admin'").all();
+  for (const admin of admins.results || []) {
+    await notify(db, admin.id, "verification", "Identity document to review", `${user.full_name} submitted a ${documentType}.`, "/app/verifications");
+  }
+  await audit(db, user, "identity.submit", "verification", id, { document_type: documentType });
+  return { id };
 }
 
 export async function verificationQueue(db, user) {
   requireUser(user);
   if (!isAdmin(user)) throw new HttpError(403, "Admin only");
+  await purgeExpiredIdentityFiles(db);
   const result = await db
     .prepare(
       `SELECT v.*, p.full_name, p.country_code
@@ -971,14 +1055,29 @@ export async function decideVerification(db, user, id, body) {
   if (!row) throw new HttpError(404, "Verification not found");
   const approved = Boolean(body?.approved);
   const now = nowIso();
+  const expires = new Date(Date.now() + IDENTITY_RETENTION_MS).toISOString();
   await db
-    .prepare("UPDATE identity_verifications SET status = ?, rejection_reason = ?, reviewed_at = ?, reviewed_by = ? WHERE id = ?")
-    .bind(approved ? "approved" : "rejected", approved ? null : clampText(body?.reason, 500) || "Not legible", now, user.id, id)
+    .prepare(
+      `UPDATE identity_verifications
+          SET status = ?, rejection_reason = ?, reviewed_at = ?, reviewed_by = ?, expires_at = ?
+        WHERE id = ?`,
+    )
+    .bind(approved ? "approved" : "rejected", approved ? null : clampText(body?.reason, 500) || "Not legible", now, user.id, expires, id)
     .run();
+  await setFileExpiry(db, row.document_storage_path, expires);
+  await setFileExpiry(db, row.selfie_storage_path, expires);
   await db
     .prepare("UPDATE developer_profiles SET identity_status = ?, tier = ?, updated_at = ? WHERE profile_id = ?")
     .bind(approved ? "approved" : "rejected", approved ? "verified" : "applicant", now, row.developer_id)
     .run();
+  await notify(
+    db,
+    row.developer_id,
+    "verification",
+    approved ? "Identity approved" : "Identity not approved",
+    approved ? "You can continue to the build exam." : "Upload a clearer photo of the full document.",
+    "/app/verification",
+  );
   return { ok: true };
 }
 
@@ -1021,11 +1120,20 @@ export async function operationsHealth(db, user) {
     .prepare("SELECT COUNT(*) AS count FROM payment_provider_events WHERE status = 'failed' AND received_at > ?")
     .bind(day)
     .first();
+  const dueRow = await db
+    .prepare(
+      `SELECT COUNT(*) AS count FROM identity_verifications
+        WHERE expires_at IS NOT NULL AND expires_at <= ? AND COALESCE(document_storage_path, '') != '[purged]'`,
+    )
+    .bind(nowIso())
+    .first();
+  const dueBefore = Number(dueRow?.count || 0);
+  await purgeExpiredIdentityFiles(db);
   return {
     pending_payments: Number(pending?.count || 0),
     failed_events_24h: Number(failed?.count || 0),
     open_critical_events: await count("SELECT COUNT(*) AS count FROM ops_events WHERE severity = 'critical' AND resolved_at IS NULL"),
-    identity_documents_due: 0,
+    identity_documents_due: dueBefore,
     checked_at: nowIso(),
   };
 }
@@ -1199,22 +1307,6 @@ export async function collectVisit(db, env, request, body) {
     )
     .run();
   return { ok: true };
-}
-
-export async function examControls(db, user) {
-  requireUser(user);
-  const row = await db.prepare("SELECT * FROM exam_controls WHERE singleton = 1").first();
-  return {
-    controls: {
-      starts_paused: bool(row?.starts_paused ?? 1),
-      auto_approve_paused: bool(row?.auto_approve_paused ?? 1),
-      updated_at: row?.updated_at || nowIso(),
-    },
-  };
-}
-
-export function examPaused() {
-  throw new HttpError(501, "Build exams are paused on this backend. No exam was started and nothing was charged.");
 }
 
 export async function inviteBuilder(db, env, user, projectId, body) {

@@ -11,7 +11,21 @@ import {
   userFromRequest,
   verify,
 } from "./auth.js";
-import { allowedOrigin, HttpError, json, readJson } from "./http.js";
+import {
+  askExam,
+  decideExam,
+  examControls,
+  holdExam,
+  myExam,
+  openExams,
+  replyExam,
+  scoreExam,
+  setExamControls,
+  startExam,
+  submitExam,
+} from "./exams.js";
+import { readPrivateFile } from "./files.js";
+import { allowedOrigin, fileResponse, HttpError, json, readJson } from "./http.js";
 import {
   acceptInvite,
   acceptMilestone,
@@ -34,12 +48,9 @@ import {
   developerListing,
   developerReviews,
   directory,
-  examControls,
-  examPaused,
   externalProofs,
   fundMilestone,
   hireFeePaid,
-  identityUnavailable,
   insights,
   inviteBuilder,
   leaveReview,
@@ -62,6 +73,7 @@ import {
   reviewBlock,
   sendMessage,
   setBidStatus,
+  submitIdentity,
   submitInterview,
   submitMilestone,
   termsAccepted,
@@ -69,7 +81,7 @@ import {
   verificationQueue,
   writeClientAudit,
 } from "./marketplace.js";
-import { confirmOrder, createOrder, paymentStatus, webhook } from "./payments.js";
+import { confirmOrder, confirmPaymentLink, createHostedLink, createOrder, paymentStatus, webhook } from "./payments.js";
 
 function match(path, pattern) {
   const names = [];
@@ -216,7 +228,14 @@ export default {
       }
       params = match(path, "/v1/blocks/:id/review");
       if (request.method === "POST" && params) return json(await reviewBlock(db, user, params.id, await readJson(request)), 200, origin);
-      if (request.method === "POST" && path === "/v1/identity") return identityUnavailable();
+      if (request.method === "POST" && path === "/v1/identity") {
+        return json(await submitIdentity(db, user, await readJson(request)), 201, origin);
+      }
+      params = match(path, "/v1/files/:id");
+      if (request.method === "GET" && params) {
+        const file = await readPrivateFile(db, user, params.id);
+        return fileResponse(file.bytes, file.mime, origin);
+      }
       if (request.method === "GET" && path === "/v1/admin/verifications") return json(await verificationQueue(db, user), 200, origin);
       params = match(path, "/v1/admin/verifications/:id");
       if (request.method === "POST" && params) return json(await decideVerification(db, user, params.id, await readJson(request)), 200, origin);
@@ -248,14 +267,35 @@ export default {
       }
       if (request.method === "POST" && path === "/v1/audit") return json(await writeClientAudit(db, user, await readJson(request)), 200, origin);
       if (request.method === "GET" && path === "/v1/exams/controls") return json(await examControls(db, user), 200, origin);
-      if (request.method === "GET" && path === "/v1/exams/mine") return json({ exam: null }, 200, origin);
-      if (request.method === "GET" && path === "/v1/exams/open") return json({ exams: [] }, 200, origin);
-      if (path.startsWith("/v1/exams")) examPaused();
+      if (request.method === "POST" && path === "/v1/exams/controls") {
+        return json(await setExamControls(db, user, await readJson(request)), 200, origin);
+      }
+      if (request.method === "GET" && path === "/v1/exams/mine") return json(await myExam(db, user), 200, origin);
+      if (request.method === "GET" && path === "/v1/exams/open") return json(await openExams(db, user), 200, origin);
+      if (request.method === "POST" && path === "/v1/exams/start") return json(await startExam(db, user), 201, origin);
+      params = match(path, "/v1/exams/:id/submit");
+      if (request.method === "POST" && params) return json(await submitExam(db, user, params.id, await readJson(request)), 200, origin);
+      params = match(path, "/v1/exams/:id/reply");
+      if (request.method === "POST" && params) return json(await replyExam(db, user, params.id, await readJson(request)), 200, origin);
+      params = match(path, "/v1/exams/:id/score");
+      if (request.method === "POST" && params) return json(await scoreExam(db, user, params.id), 200, origin);
+      params = match(path, "/v1/exams/:id/ask");
+      if (request.method === "POST" && params) return json(await askExam(db, user, params.id, await readJson(request)), 200, origin);
+      params = match(path, "/v1/exams/:id/hold");
+      if (request.method === "POST" && params) return json(await holdExam(db, user, params.id, await readJson(request)), 200, origin);
+      params = match(path, "/v1/exams/:id/decide");
+      if (request.method === "POST" && params) return json(await decideExam(db, user, params.id, await readJson(request)), 200, origin);
       if (request.method === "POST" && path === "/v1/payments/razorpay/order") {
         return json(await createOrder(db, env, request, user, await readJson(request)), 200, origin);
       }
       if (request.method === "POST" && path === "/v1/payments/razorpay/confirm") {
         return json(await confirmOrder(db, env, user, await readJson(request)), 200, origin);
+      }
+      if (request.method === "POST" && path === "/v1/payments/razorpay/link") {
+        return json(await createHostedLink(db, env, user, await readJson(request)), 200, origin);
+      }
+      if (request.method === "POST" && path === "/v1/payments/razorpay/link-return") {
+        return json(await confirmPaymentLink(db, env, user, await readJson(request)), 200, origin);
       }
       params = match(path, "/v1/payments/:id");
       if (request.method === "GET" && params) return json(await paymentStatus(db, user, params.id), 200, origin);

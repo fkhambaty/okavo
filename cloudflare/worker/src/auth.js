@@ -1,5 +1,5 @@
 import { HttpError, clampText, clientIp } from "./http.js";
-import { bytesToHex, hashPassword, newCode, nowIso, sha256 } from "./pure.js";
+import { bytesToHex, hashPassword, newCode, nowIso, ownerEmailSet, sha256 } from "./pure.js";
 
 const CODE_MINUTES = 15;
 const MAX_CODE_ATTEMPTS = 5;
@@ -8,12 +8,25 @@ const ACCESS_MS = 15 * 60 * 1000;
 const REFRESH_MS = 30 * 24 * 60 * 60 * 1000;
 
 function adminEmails(env) {
-  return new Set(
-    String(env.ADMIN_EMAILS || "")
-      .split(",")
-      .map((value) => value.trim().toLowerCase())
-      .filter(Boolean),
-  );
+  return ownerEmailSet(env);
+}
+
+async function promoteOwner(db, env, profile) {
+  if (!profile || !adminEmails(env).has(String(profile.email || "").toLowerCase())) return profile;
+  if (profile.role === "admin") return profile;
+  const now = nowIso();
+  await db.prepare("UPDATE profiles SET role = 'admin', updated_at = ? WHERE id = ?").bind(now, profile.id).run();
+  const buyer = await db.prepare("SELECT profile_id FROM buyer_profiles WHERE profile_id = ?").bind(profile.id).first();
+  if (!buyer) {
+    await db
+      .prepare(
+        `INSERT INTO buyer_profiles (profile_id, organization_name, scale, created_at, updated_at)
+         VALUES (?, ?, 'local_business', ?, ?)`,
+      )
+      .bind(profile.id, profile.full_name || profile.email, now, now)
+      .run();
+  }
+  return { ...profile, role: "admin" };
 }
 
 export function publicUser(row) {
@@ -295,6 +308,7 @@ export async function verify(db, env, body) {
   }
   const now = nowIso();
   await db.prepare("UPDATE profiles SET email_verified_at = ?, updated_at = ? WHERE id = ?").bind(now, now, profile.id).run();
+  await promoteOwner(db, env, { ...profile, email_verified_at: now });
   return issueSession(db, profile.id);
 }
 
@@ -319,6 +333,7 @@ export async function login(db, env, request, body) {
     if (emailReady(env)) await issueCode(db, env, profile.email, "verify");
     throw new HttpError(403, "Confirm your email first. We sent you a code.");
   }
+  await promoteOwner(db, env, profile);
   return issueSession(db, profile.id);
 }
 

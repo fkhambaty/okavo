@@ -177,9 +177,8 @@ export default function AdminVerifications() {
         )}
 
         <p style={{ color: "var(--muted)", fontSize: "0.8125rem", marginTop: "1rem" }}>
-          Documents open through short-lived signed links. Approving sets the
-          developer to verified, which the bidding trigger checks before any bid
-          is accepted.
+          Documents open only for the developer and admins. Approving sets the
+          developer to verified. The files are deleted 90 days after this decision.
         </p>
       </div>
     </>

@@ -12,6 +12,22 @@ export class HttpError extends Error {
   }
 }
 
+export function fileResponse(bytes, mime, origin) {
+  const headers = {
+    "content-type": mime || "application/octet-stream",
+    "cache-control": "no-store",
+    "x-content-type-options": "nosniff",
+    "content-disposition": "inline",
+  };
+  if (origin) {
+    headers["access-control-allow-origin"] = origin;
+    headers["access-control-allow-headers"] = "authorization, content-type, x-okavo-ingest, x-okavo-client-ip";
+    headers["access-control-allow-methods"] = "GET, POST, OPTIONS";
+    headers.vary = "Origin";
+  }
+  return new Response(bytes, { status: 200, headers });
+}
+
 export function json(body, status, origin) {
   const headers = {
     "content-type": "application/json; charset=utf-8",

@@ -11,6 +11,10 @@ MAIL_FROM = "Okavo <support@okavo.org>"
 # Set RAZORPAY_PAYMENTS_ENABLED to anything but "true" to stop all charges.
 RAZORPAY_KEY_ID = "rzp_live_Tn7dYq8sfB9jgp"
 RAZORPAY_PAYMENTS_ENABLED = "true"
+# hosted = Razorpay Payment Link on razorpay.com (works before okavo.org is
+# approved for Standard Checkout). Set to "modal" after approval.
+CHECKOUT_MODE = "hosted"
+ADMIN_EMAILS = "fakhruddinkhambaty@gmail.com,fktiindia@gmail.com"
 
 [[d1_databases]]
 binding = "DB"

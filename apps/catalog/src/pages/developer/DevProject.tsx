@@ -89,8 +89,9 @@ export default function DevProject() {
   const clarifying = project.stage === "clarifying";
   const frozen = project.stage === "locked";
   const identityApproved = developerAccount.identityStatus === "approved";
+  const examApproved = developerAccount.interviewStatus === "approved";
   const canBid =
-    frozen && developerAccount.membershipPaid && identityApproved;
+    frozen && developerAccount.membershipPaid && identityApproved && examApproved;
   const myExistingBid = project.bids.find(
     (bid) => bid.developerId === userId || bid.developerId === "me"
   );
@@ -305,7 +306,22 @@ export default function DevProject() {
                 </div>
               )}
 
-              {frozen && identityApproved && !developerAccount.membershipPaid && (
+              {frozen && identityApproved && !examApproved && (
+                <div className="paywall" style={{ marginBottom: "1rem" }}>
+                  <div>
+                    <strong>Pass the build exam before bidding</strong>
+                    <p>
+                      Identity is approved. Finish the timed build exam, then
+                      pay membership, before a bid can be placed.
+                    </p>
+                  </div>
+                  <Link className="btn btn-sm" to="/app/verification">
+                    Open the exam
+                  </Link>
+                </div>
+              )}
+
+              {frozen && identityApproved && examApproved && !developerAccount.membershipPaid && (
                 <div className="paywall" style={{ marginBottom: "1rem" }}>
                   <div>
                     <strong>Pay {MEMBERSHIP_FEE_LABEL} once to bid</strong>

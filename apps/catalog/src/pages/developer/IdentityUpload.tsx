@@ -22,7 +22,7 @@ const COUNTRIES = [
   "Other",
 ];
 
-const MAX_BYTES = 8 * 1024 * 1024;
+const MAX_BYTES = 5 * 1024 * 1024;
 
 type Props = {
   status: string;
@@ -48,7 +48,7 @@ export default function IdentityUpload({ status, onSubmitted }: Props) {
       const file = event.target.files?.[0] ?? null;
       setError(null);
       if (file && file.size > MAX_BYTES) {
-        setError("That file is over 8 MB. Please upload a smaller scan.");
+        setError("That file is over 5 MB. Please upload a smaller scan.");
         setter(null);
         return;
       }
@@ -137,7 +137,7 @@ export default function IdentityUpload({ status, onSubmitted }: Props) {
           onChange={pick(setDocument)}
         />
         <span className="hint">
-          JPG, PNG, WebP or PDF, up to 8 MB. All four corners must be visible.
+          JPG, PNG, WebP or PDF, up to 5 MB. All four corners must be visible.
         </span>
       </div>
 
@@ -173,8 +173,9 @@ export default function IdentityUpload({ status, onSubmitted }: Props) {
       </button>
 
       <p style={{ color: "var(--muted)", fontSize: "0.75rem", marginTop: "0.75rem" }}>
-        Files go to a private bucket that only you and the review team can open.
-        Buyers never see your documents — only that you are verified.
+        Files stay in private storage that only you and the review team can open.
+        Buyers never see your documents — only that you are verified. They are
+        deleted 90 days after a decision.
       </p>
     </div>
   );
