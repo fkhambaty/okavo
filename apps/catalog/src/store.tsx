@@ -12,6 +12,7 @@ import { useAuth } from "./lib/auth";
 import { isBackendConfigured } from "./lib/backend";
 import { MEMBERSHIP_FEE_MINOR, POSTING_FEE_MINOR } from "./lib/pricing";
 import {
+  DUMMY_DEVELOPER_ACCOUNT,
   NEW_DEVELOPER_ACCOUNT,
   NOTIFICATIONS,
   PROJECTS,
@@ -50,6 +51,7 @@ type StoreValue = {
   email: string | null;
   userId: string | null;
   connected: boolean;
+  demoMode: boolean;
   loading: boolean;
   /** False until the first live fetch settles, so pages can hold back empty states. */
   hydrated: boolean;
@@ -210,7 +212,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setProjects(PROJECTS);
       setThreads(THREADS);
       setNotifications(NOTIFICATIONS);
-      setDeveloperAccount(NEW_DEVELOPER_ACCOUNT);
+      setDeveloperAccount(DUMMY_DEVELOPER_ACCOUNT);
       setPostingFeesPaid(0);
       setError(null);
       setHydrated(true);
@@ -906,6 +908,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       email: auth.email,
       userId: auth.userId,
       connected: isBackendConfigured && !auth.demoMode,
+      demoMode: auth.demoMode,
       loading,
       hydrated,
       error,

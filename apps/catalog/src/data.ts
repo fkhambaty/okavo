@@ -96,6 +96,21 @@ export const DEVELOPER_LISTINGS: DeveloperListing[] = DEVELOPERS.map(
   })
 );
 
+/** The dummy login. Top tier, already unlocked, and never billed. */
+export const DUMMY_DEVELOPER_ACCOUNT: DeveloperAccount = {
+  identityStatus: "approved",
+  interviewStatus: "approved",
+  membershipPaid: true,
+  membershipPaidAt: "Lifetime",
+  tier: "Principal",
+  interviewScores: [
+    { label: "Security practices", score: 96 },
+    { label: "Efficiency under time pressure", score: 94 },
+    { label: "Maintainability and structure", score: 97 },
+    { label: "Recovery from mistakes", score: 93 },
+  ],
+};
+
 /** A developer who has verified identity but has not paid to bid yet. */
 export const NEW_DEVELOPER_ACCOUNT: DeveloperAccount = {
   identityStatus: "approved",

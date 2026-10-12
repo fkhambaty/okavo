@@ -46,6 +46,7 @@ export default function AppShell() {
     notifications,
     developerAccount,
     connected,
+    demoMode,
     loading,
     error,
   } = useStore();
@@ -174,7 +175,9 @@ export default function AppShell() {
             <span className="side-user-text">
               <strong>{name}</strong>
               <span>
-                {isAdmin
+                {demoMode
+                  ? "Principal · lifetime"
+                  : isAdmin
                   ? "Administrator"
                   : isBuyer
                     ? "Buyer"
