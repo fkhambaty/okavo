@@ -12,3 +12,5 @@ supabase/.temp/
 .okavo-agent
 
 .indexnow-key
+.vercel
+.env*
