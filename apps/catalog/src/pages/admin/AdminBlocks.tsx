@@ -59,7 +59,7 @@ export default function AdminBlocks() {
         </div>
       </header>
       <div className="content">
-        <p style={{ color: "var(--muted)", maxWidth: "40rem" }}>
+        <p className="page-lede">
           Buyers request blocks for ghosting or cheating. Approving bans the
           developer from bidding on Okavo.
         </p>

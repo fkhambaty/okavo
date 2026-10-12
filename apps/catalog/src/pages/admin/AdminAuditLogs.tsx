@@ -83,7 +83,7 @@ export default function AdminAuditLogs() {
       </header>
 
       <div className="content">
-        <p style={{ color: "var(--muted)", marginTop: 0, maxWidth: "46rem" }}>
+        <p className="page-lede">
           Security and money actions — sign-in, fees, publish, lock, bid,
           hire, fund, accept, clarifications, guardrail blocks, and grounded
           assist. Age buckets are exclusive partitions so each event appears in

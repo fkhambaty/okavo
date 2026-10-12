@@ -68,9 +68,11 @@ export default function Security() {
       <section className="section">
         <div className="wrap">
           <div className="promise-list">
-            {CONTROLS.map((control) => (
+            {CONTROLS.map((control, index) => (
               <article className="promise" key={control.area}>
-                <div className="promise-num">—</div>
+                <div className="promise-num">
+                  {String(index + 1).padStart(2, "0")}
+                </div>
                 <div>
                   <h2>{control.area}</h2>
                   <p>{control.detail}</p>

@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, type ReactElement, type ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import AppShell from "./components/AppShell";
+import LoadingState from "./components/LoadingState";
 import { TermsGate } from "./components/TermsGate";
 import { trackPageView } from "./lib/analytics";
 import { IdleSessionGuard } from "./lib/idleSession";
@@ -43,11 +44,7 @@ const Earnings = lazy(() => import("./pages/developer/Earnings"));
 const Verification = lazy(() => import("./pages/developer/Verification"));
 
 function RouteFallback() {
-  return (
-    <div className="auth-screen" role="status" aria-live="polite">
-      <p style={{ color: "var(--muted)" }}>Loading…</p>
-    </div>
-  );
+  return <LoadingState label="Loading…" />;
 }
 
 function Lazy({ children }: { children: ReactNode }) {
@@ -57,11 +54,7 @@ function Lazy({ children }: { children: ReactNode }) {
 function RequireAuth({ children }: { children: ReactElement }) {
   const { role, ready } = useAuth();
   if (!ready) {
-    return (
-      <div className="auth-screen">
-        <p style={{ color: "var(--muted)" }}>Loading your workspace…</p>
-      </div>
-    );
+    return <LoadingState label="Loading your workspace…" />;
   }
   // Signing out drops the role to guest while the workspace is still mounted,
   // so this is also the redirect that runs on sign-out. Send people home

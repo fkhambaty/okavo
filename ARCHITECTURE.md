@@ -92,6 +92,12 @@ npm run build
 
 Copy `scripts/env.example` to `.okavo-agent` and `apps/catalog/env.example` to `apps/catalog/.env.local`.
 
+## Design system
+
+The catalog UI is a warm editorial system: paper (`--paper`, `--bg`), ink (`--ink`), and one amber signal (`--accent`). Tokens and primitives live in `apps/catalog/src/index.css`. Shared React pieces are `LoadingState` (route and gate waits), `MarketingLayout` (public chrome), and `AppShell` (signed-in chrome). Sign-in uses `AuthFrame` in `pages/SignIn.tsx`.
+
+Prefer the semantic aliases (`--text`, `--border`, `--focus-ring`, `--on-ink`, `--measure`) over new hex values. Status colours stay honest: green is a lock or a live connection, amber is attention, red is a real failure. Do not add testimonials, counts, logos, escrow, or a delivery guarantee in the visual layer. Motion is short (`--dur`) and turns off under `prefers-reduced-motion`. Prices stay in `apps/catalog/src/lib/pricing.ts`. Security copy stays in the page source and in `apps/catalog/src/content/trust.ts`.
+
 ## What not to get wrong
 
 - Do not invent testimonials, country counts, or customer logos. A fake "74 countries" claim was removed once already.

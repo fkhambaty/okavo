@@ -17,7 +17,7 @@ export default function Privacy() {
       </section>
 
       <section className="section">
-        <div className="wrap" style={{ maxWidth: "42rem" }}>
+        <div className="wrap prose">
           <h2>What we collect</h2>
           <p>
             Account details (name, email, role), requirement and bid content,

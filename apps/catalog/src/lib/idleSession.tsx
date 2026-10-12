@@ -85,27 +85,13 @@ export function IdleSessionGuard() {
 
   return (
     <div
+      className="idle-dialog"
       role="alertdialog"
       aria-labelledby="idle-warn-title"
       aria-describedby="idle-warn-body"
-      style={{
-        position: "fixed",
-        right: "1rem",
-        bottom: "1rem",
-        zIndex: 10000,
-        maxWidth: "22rem",
-        padding: "1rem 1.1rem",
-        borderRadius: "12px",
-        background: "var(--ink, #0c0d10)",
-        color: "var(--paper, #f7f4ef)",
-        boxShadow: "0 12px 40px rgba(0,0,0,0.28)",
-        border: "1px solid rgba(255,255,255,0.12)",
-      }}
     >
-      <strong id="idle-warn-title" style={{ display: "block", marginBottom: "0.35rem" }}>
-        Still there?
-      </strong>
-      <p id="idle-warn-body" style={{ margin: "0 0 0.75rem", fontSize: "0.92rem", opacity: 0.9 }}>
+      <strong id="idle-warn-title">Still there?</strong>
+      <p id="idle-warn-body">
         You will be signed out in about a minute for inactivity. Move the mouse
         or press a key to stay signed in.
       </p>

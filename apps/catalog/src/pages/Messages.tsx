@@ -58,7 +58,7 @@ export default function Messages() {
                 </div>
                 <div className="bubbles">
                   {active.messages.length === 0 && (
-                    <p className="hint" style={{ padding: "0.5rem 0" }}>
+                    <p className="hint thread-empty">
                       No messages yet. Ask anything about the locked scope
                       before work starts — it is cheaper to clarify now.
                     </p>

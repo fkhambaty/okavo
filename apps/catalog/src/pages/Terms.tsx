@@ -21,7 +21,7 @@ export default function Terms() {
       </section>
 
       <section className="section">
-        <div className="wrap" style={{ maxWidth: "42rem" }}>
+        <div className="wrap prose">
           <h2>1. What Okavo is</h2>
           <p>
             Okavo operates an online marketplace that helps buyers describe
@@ -120,7 +120,7 @@ export default function Terms() {
             sign-in, constitutes agreement to the updated terms.
           </p>
 
-          <p className="hint" style={{ marginTop: "2rem" }}>
+          <p className="hint prose-note">
             Questions: support@okavo.org. This page is not personalised legal
             advice. Have your own lawyer review contracts that matter to you.
           </p>

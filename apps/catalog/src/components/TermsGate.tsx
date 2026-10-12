@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactElement } from "react";
 import { Link } from "react-router-dom";
+import LoadingState from "./LoadingState";
 import * as api from "../lib/api";
 import { TERMS_VERSION } from "../lib/terms";
 import { useAuth } from "../lib/auth";
@@ -49,13 +50,7 @@ export function TermsGate({ children }: { children: ReactElement }) {
   if (!connected || status === "ok") return children;
 
   if (status === "checking") {
-    return (
-      <div className="auth-screen">
-        <div className="auth-card">
-          <p style={{ margin: 0, color: "var(--muted)" }}>Opening your workspace…</p>
-        </div>
-      </div>
-    );
+    return <LoadingState compact label="Opening your workspace…" />;
   }
 
   return (

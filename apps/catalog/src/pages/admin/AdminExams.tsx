@@ -44,14 +44,14 @@ export default function AdminExams() {
         </div>
       </header>
       <div className="content">
-        <p style={{ color: "var(--muted)", maxWidth: "42rem" }}>
+        <p className="page-lede">
           Timed developer challenges. After 48 hours, only an exam scoring{" "}
           {EXAM_AUTO_APPROVE_MIN_SCORE}+ can auto-approve. Missing or lower
           scores stay here for a person. Duplicate repositories and forks are
           flagged for review, never automatically rejected.
         </p>
         {controls && (
-          <div className="card card-pad" style={{ marginBottom: "1rem" }}>
+          <div className="card card-pad u-mb">
             <strong>Operational controls</strong>
             <p className="hint">
               Use these switches during incidents or when the review team is

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "../brand";
 import Logo from "./Logo";
 
@@ -29,11 +29,17 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
           <Link to="/" onClick={close}>
             <Logo />
           </Link>
-          <nav className="market-links">
+          <nav className="market-links" aria-label="Primary">
             {NAV.map((item) => (
-              <Link key={item.href} to={item.href}>
+              <NavLink
+                key={item.href}
+                to={item.href}
+                className={({ isActive }) =>
+                  isActive ? "market-link active" : "market-link"
+                }
+              >
                 {item.label}
-              </Link>
+              </NavLink>
             ))}
           </nav>
           <div className="nav-right">
@@ -62,9 +68,16 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
           <div className="market-menu" id="market-menu">
             <div className="wrap market-menu-inner">
               {NAV.map((item) => (
-                <Link key={item.href} to={item.href} onClick={close}>
+                <NavLink
+                  key={item.href}
+                  to={item.href}
+                  className={({ isActive }) =>
+                    isActive ? "market-link active" : "market-link"
+                  }
+                  onClick={close}
+                >
                   {item.label}
-                </Link>
+                </NavLink>
               ))}
               <div className="market-menu-actions">
                 <Link className="btn btn-secondary" to="/signin" onClick={close}>

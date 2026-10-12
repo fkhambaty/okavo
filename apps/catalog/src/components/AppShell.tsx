@@ -90,6 +90,9 @@ export default function AppShell() {
 
   return (
     <div className={navOpen ? "app nav-open" : "app"}>
+      <a className="skip-link" href="#workspace-main">
+        Skip to content
+      </a>
       <header className="mobile-bar">
         <button
           type="button"
@@ -191,7 +194,7 @@ export default function AppShell() {
         </div>
       </aside>
 
-      <div className="main">
+      <div className="main" id="workspace-main">
         {error && (
           <div className="db-error">
             <strong>Database error</strong>

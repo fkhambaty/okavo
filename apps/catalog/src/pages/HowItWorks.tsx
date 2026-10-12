@@ -87,7 +87,7 @@ export default function HowItWorks() {
             people who pictured different things and only found out at the end.
             Okavo removes the gap by making the expectation a document.
           </p>
-          <p style={{ marginTop: "0.75rem" }}>
+          <p className="page-hero-follow">
             Prefer a story with faces?{" "}
             <Link to="/example">Follow the Rose Street Bakery walkthrough</Link>.
           </p>
@@ -154,7 +154,7 @@ export default function HowItWorks() {
                 The guarantee lists six promises and what enforces each one.
               </p>
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
+            <div className="hero-actions">
               <Link className="btn btn-accent btn-lg" to="/example">
                 Example walkthrough
               </Link>

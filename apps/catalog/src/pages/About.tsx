@@ -89,12 +89,10 @@ export default function About() {
           </div>
           <div className="grid-2">
             {PRINCIPLES.map((principle) => (
-              <div className="card card-pad" key={principle.title}>
-                <h3 style={{ fontSize: "1rem", marginBottom: "0.4rem" }}>
-                  {principle.title}
-                </h3>
-                <p style={{ color: "var(--muted)" }}>{principle.body}</p>
-              </div>
+              <article className="card card-pad principle" key={principle.title}>
+                <h3>{principle.title}</h3>
+                <p>{principle.body}</p>
+              </article>
             ))}
           </div>
         </div>

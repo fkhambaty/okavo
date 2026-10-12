@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, Navigate } from "react-router-dom";
 import Logo from "../components/Logo";
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "../brand";
@@ -9,6 +9,44 @@ import { TERMS_VERSION } from "../lib/terms";
 import type { BuyerScale, Role } from "../types";
 
 type Mode = "signin" | "signup";
+
+const BUYER_POINTS = [
+  "Describe the outcome in plain language, then sign the scope before anyone builds.",
+  "Developers bid only after a person has checked their identity.",
+  "Okavo does not hold build money or guarantee the other party’s performance.",
+];
+
+function AuthFrame({
+  kicker,
+  title,
+  points,
+  children,
+}: {
+  kicker: string;
+  title: string;
+  points: string[];
+  children: ReactNode;
+}) {
+  return (
+    <div className="auth-screen">
+      <div className="auth-layout">
+        <aside className="auth-aside">
+          <Link to="/" className="auth-brand">
+            <Logo />
+          </Link>
+          <p className="auth-aside-kicker">{kicker}</p>
+          <h2>{title}</h2>
+          <ul>
+            {points.map((point) => (
+              <li key={point}>{point}</li>
+            ))}
+          </ul>
+        </aside>
+        <div className="auth-card">{children}</div>
+      </div>
+    </div>
+  );
+}
 
 export default function SignIn() {
   const auth = useAuth();
@@ -100,11 +138,14 @@ export default function SignIn() {
 
   if (auth.passwordRecovery) {
     return (
-      <div className="auth-screen">
-        <div className="auth-card">
-          <Link to="/" style={{ display: "inline-block", marginBottom: "1.5rem" }}>
-            <Logo />
-          </Link>
+      <AuthFrame
+        kicker="Account"
+        title="Choose a new password."
+        points={[
+          `This replaces the password for ${auth.email ?? "your account"}.`,
+          "Use at least 6 characters.",
+        ]}
+      >
           <h1>Choose a new password</h1>
           <p>Enter a new password for {auth.email ?? "your account"}.</p>
 
@@ -121,14 +162,14 @@ export default function SignIn() {
           </div>
 
           {auth.error && (
-            <div className="callout callout-warn" style={{ marginBottom: "1rem" }}>
+            <div className="callout callout-warn">
               <span>!</span>
               <span>{auth.error}</span>
             </div>
           )}
 
           {notice && (
-            <div className="callout callout-ok" style={{ marginBottom: "1rem" }}>
+            <div className="callout callout-ok">
               <span>✓</span>
               <span>{notice}</span>
             </div>
@@ -142,18 +183,16 @@ export default function SignIn() {
           >
             {busy ? "Working…" : "Save password"}
           </button>
-        </div>
-      </div>
+      </AuthFrame>
     );
   }
 
   return (
-    <div className="auth-screen">
-      <div className="auth-card">
-        <Link to="/" style={{ display: "inline-block", marginBottom: "1.5rem" }}>
-          <Logo />
-        </Link>
-
+    <AuthFrame
+      kicker="Okavo"
+      title="Sign the scope before anyone writes code."
+      points={BUYER_POINTS}
+    >
         <h1>{mode === "signin" ? "Sign in to Okavo" : "Create your account"}</h1>
         <p>
           {auth.connected
@@ -273,34 +312,24 @@ export default function SignIn() {
         )}
 
         {auth.error && (
-          <div className="callout callout-warn" style={{ marginBottom: "1rem" }}>
+          <div className="callout callout-warn">
             <span>!</span>
             <span>{auth.error}</span>
           </div>
         )}
 
         {notice && (
-          <div className="callout callout-ok" style={{ marginBottom: "1rem" }}>
+          <div className="callout callout-ok">
             <span>✓</span>
             <span>{notice}</span>
           </div>
         )}
 
-        <label
-          style={{
-            display: "flex",
-            gap: "0.65rem",
-            alignItems: "flex-start",
-            marginBottom: "1rem",
-            fontSize: "0.9rem",
-            color: "var(--body)",
-          }}
-        >
+        <label className="terms-check">
           <input
             type="checkbox"
             checked={acceptedTerms}
             onChange={(e) => setAcceptedTerms(e.target.checked)}
-            style={{ marginTop: "0.2rem" }}
           />
           <span>
             I agree to the{" "}
@@ -359,7 +388,6 @@ export default function SignIn() {
           Need help?{" "}
           <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>
         </p>
-      </div>
-    </div>
+    </AuthFrame>
   );
 }
