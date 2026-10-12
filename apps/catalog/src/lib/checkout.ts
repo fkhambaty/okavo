@@ -199,7 +199,7 @@ export async function collectFee(
       order_id: order.orderId,
       amount: order.amount,
       currency: order.currency,
-      name: "Okavo",
+      name: "FKTech",
       description: order.label,
       prefill: {
         name: buyer?.name ?? "",

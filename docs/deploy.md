@@ -171,62 +171,43 @@ OTP templates to mention `support@okavo.org`.
 
 ## Payments (Razorpay is the live rail)
 
-Money is never written by the browser. Amounts are decided in the edge
-functions, and a payment is only marked paid by a signature-verified webhook via
-the `settle_provider_payment` RPC (amount/currency/order must match; mismatches
-are logged to `ops_events`). The `payments` table stays read-only for signed-in
-users.
+Okavo, FunBerry Kids and Data For Dummies share one FKTech Razorpay account.
+Checkout shows **FKTech** as the merchant name, and the description names the
+Okavo fee being paid.
 
-**Razorpay** is the only enabled provider. **Stripe is hard-disabled**: every
-Stripe function refuses to run unless `PAYMENTS_PROVIDER=stripe` is explicitly
-set, so the stubs cannot process money by accident.
+Money is never written by the browser. The `okavo-api` Cloudflare Worker
+(`cloudflare/worker/src/payments.js`) decides every amount, creates the
+Razorpay order, and marks a D1 `payments` row paid only after both checks pass:
+the checkout signature (`order_id|payment_id`, HMAC with the key secret) and a
+live `GET /v1/payments/{id}` showing `captured` with the same order, amount and
+currency. Mismatches are written to `ops_events`. The signed webhook settles
+the same row if the browser closes before confirmation.
 
-Set these Supabase function secrets (production):
-
-| Secret | Where it comes from |
-|--------|---------------------|
-| `RAZORPAY_KEY_ID` | Razorpay → Settings → API Keys |
-| `RAZORPAY_KEY_SECRET` | Razorpay → Settings → API Keys |
-| `RAZORPAY_WEBHOOK_SECRET` | Razorpay → Settings → Webhooks → signing secret |
-| `RAZORPAY_RECONCILE_SECRET` | Any strong random string; sent as `x-okavo-notify` to `razorpay-reconcile` |
-| `RAZORPAY_PAYMENTS_ENABLED` | Set to `true` only after the live domain and webhook have been verified |
-| `SITE_URL` | `https://okavo.org` |
-| `IDENTITY_SWEEP_SECRET` | Any strong random string; gate for `identity-retention-sweep` |
-| `RATE_LIMIT_SALT` | Optional; salts hashed rate-limit buckets (defaults to `okavo-edge-v1`) |
-| `OPENAI_API_KEY` | Optional; enables LLM assist/exam analysis (heuristics run without it) |
+| Setting | Where |
+|---------|-------|
+| `RAZORPAY_KEY_ID` | `wrangler.toml` var (public key id) |
+| `RAZORPAY_KEY_SECRET` | Worker secret |
+| `RAZORPAY_WEBHOOK_SECRET` | Worker secret; must match the Okavo webhook in Razorpay |
+| `RAZORPAY_PAYMENTS_ENABLED` | `wrangler.toml` var; anything but `true` stops order creation |
 
 ```bash
-supabase secrets set --project-ref fzgnzaflvbimbiseqnrz \
-  RAZORPAY_KEY_ID=rzp_... RAZORPAY_KEY_SECRET=... RAZORPAY_WEBHOOK_SECRET=... \
-  RAZORPAY_RECONCILE_SECRET=... IDENTITY_SWEEP_SECRET=...
+cd cloudflare/worker
+printf %s "$RAZORPAY_KEY_SECRET" | npx wrangler secret put RAZORPAY_KEY_SECRET
+printf %s "$RAZORPAY_WEBHOOK_SECRET" | npx wrangler secret put RAZORPAY_WEBHOOK_SECRET
+npx wrangler deploy
 ```
 
-In Razorpay, add one webhook endpoint pointing at
-`https://fzgnzaflvbimbiseqnrz.supabase.co/functions/v1/razorpay-webhook`.
-`razorpay-reconcile` is read-only by default (reports drift); it only writes
-settlements when invoked with `ALLOW_PAYMENT_RECONCILIATION=true`.
+Webhook: `https://okavo-api.fkhambaty.workers.dev/v1/payments/razorpay/webhook`,
+event `payment.captured`, signed with `RAZORPAY_WEBHOOK_SECRET`. Each product
+has its own webhook URL and secret on the shared account.
 
-Before setting `RAZORPAY_PAYMENTS_ENABLED=true`, Razorpay Dashboard must show
-`https://okavo.org` as approved under **Account & Settings → Business website
-details**. Run one live ₹1/₹99 smoke payment and confirm that the payment is
-`captured`, its webhook event is processed, and the matching Okavo payment row
-is `paid`. Leave the flag unset or `false` while the domain is pending or after
-any payment-integrity deployment mismatch; checkout then fails closed before an
-order is created.
+Razorpay rejects live payments from websites that are not approved on the
+account. `https://okavo.org` must be listed under **Account & Settings →
+Business website details** (use **Add additional website/app**; never replace
+the primary website, which would stop the other products' checkout).
 
-If the same Razorpay merchant also serves another business website, add Okavo
-with **Add additional website/app**. Do not replace the approved primary
-website: an approved edit replaces it and can stop that website's checkout.
-After adding or changing any domain, leave payments disabled until Razorpay
-shows every domain that must collect money as approved.
-
-The production schema and edge functions must be deployed together. Apply
-migrations `0021` through `0025` in filename order before deploying
-`razorpay-order`, `razorpay-confirm`, `razorpay-webhook`, and
-`razorpay-reconcile`. In particular, migration `0023_payment_ops.sql` creates
-the provider IDs, webhook ledger, settlement RPC, and operations events used by
-those functions. Deploying the functions first leaves captured payments unable
-to reconcile.
+Stripe stays hard-disabled. The `supabase/functions/razorpay-*` files belong to
+the deleted Supabase project and are retired.
 
 Prices for platform fees live in `apps/catalog/src/lib/pricing.ts` (display) and
 the Razorpay edge functions (charge in INR paise): ₹99 posting / ₹899 membership,

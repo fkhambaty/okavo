@@ -6,7 +6,7 @@ Written 12 October 2026 so a different AI on a different computer can work witho
 
 Production no longer uses Supabase. The project `fzgnzaflvbimbiseqnrz` was deleted. Accounts, marketplace rows, and payment records live in the existing Cloudflare D1 database `okavo` (`3d3afb8e-1749-4c70-8001-e115504e3b03`) on account `ec00d4a6131c20118d82605d6b969c8e`. The API is the Worker `okavo-api` at `https://okavo-api.fkhambaty.workers.dev` (`cloudflare/worker`). The browser calls that Worker with a short-lived bearer token. The Vercel `/api/auth` routes still own the HttpOnly refresh cookie and never put the session in `localStorage`.
 
-Signup does not create a session until a 6-digit email code is confirmed. Password reset uses the same kind of code. Sending those codes requires the `okavo.org` domain to be verified in Resend. On 13 October 2026 Resend rejected `Okavo <support@okavo.org>` with “The okavo.org domain is not verified.” Until that domain is verified, signup and password-reset return an error and do not create a session. A profile inserted directly in D1 with `email_verified_at` set can still log in. The Worker chooses Razorpay amounts. A payment is marked paid only after a verified signature and, when live charges are switched on, a captured Razorpay payment whose amount matches the stored order. `RAZORPAY_PAYMENTS_ENABLED` stays `false` unless a real `rzp_` key is configured, so order creation does not call Razorpay and does not charge anyone. The dummy login (`dummy` / `dummy`) stays in the browser, uses fixture rows, and never calls the Worker or Razorpay.
+Signup does not create a session until a 6-digit email code is confirmed. Password reset uses the same kind of code. Sending those codes requires the `okavo.org` domain to be verified in Resend. On 13 October 2026 Resend rejected `Okavo <support@okavo.org>` with “The okavo.org domain is not verified.” Until that domain is verified, signup and password-reset return an error and do not create a session. A profile inserted directly in D1 with `email_verified_at` set can still log in. The Worker chooses Razorpay amounts. A payment is marked paid only after a verified signature and, when live charges are switched on, a captured Razorpay payment whose amount matches the stored order. Live charges are on: the Worker holds the FKTech live key (`RAZORPAY_KEY_ID` var, `RAZORPAY_KEY_SECRET` and `RAZORPAY_WEBHOOK_SECRET` secrets) with `RAZORPAY_PAYMENTS_ENABLED = "true"`. One FKTech Razorpay account serves Okavo, FunBerry Kids and Data For Dummies, and checkout shows FKTech as the merchant. Setting the flag to anything else stops order creation before Razorpay is called. The dummy login (`dummy` / `dummy`) stays in the browser, uses fixture rows, and never calls the Worker or Razorpay.
 
 ```
 Browser
@@ -59,7 +59,7 @@ Browser (Vite React SPA, apps/catalog)
       → Auth
       → Postgres + row-level security
       → Edge functions for Razorpay, exams, signup mail, retention
-  → Razorpay for the posting fee, the developer membership, and the hire success fee
+  → Razorpay (shared FKTech account, via the Worker) for the posting fee, the developer membership, and the hire success fee
 ```
 
 There is no separate application server. If Supabase is paused, sign-in, bids, and payments stop, even when the marketing HTML still loads.
@@ -86,7 +86,7 @@ Marketing: `/`, `/how-it-works`, `/example`, `/guarantee`, `/security`, `/faq`, 
 
 Signed-in workspace, under `/app`: project, contract, contracts, messages, notifications, and role-specific pages (buyer intake and payments, developer bids and earnings and verification, admin review).
 
-Fees and copy that quote money live in `apps/catalog/src/lib/pricing.ts`. Change them there. The browser must not tell the server an amount. A payment is marked paid only after a signature-checked webhook (or the confirm path) through `settle_provider_payment`.
+Fees and copy that quote money live in `apps/catalog/src/lib/pricing.ts`. Change them there. The browser must not tell the server an amount. A payment is marked paid only by the Worker, after the signature-checked confirm path or the signed webhook (`cloudflare/worker/src/payments.js`, `settlePayment`).
 
 ## Data and auth
 
