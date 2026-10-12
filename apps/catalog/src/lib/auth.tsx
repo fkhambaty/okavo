@@ -7,9 +7,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { Session } from "@supabase/supabase-js";
 import { logAudit } from "./audit";
-import { getSupabase, isSupabaseConfigured } from "./supabase";
+import { backend, isBackendConfigured } from "./backend";
 import {
   onMemorySessionChange,
   receptionistSignIn,
@@ -18,7 +17,10 @@ import {
   refreshMemorySession,
   requestPasswordRecovery,
   resendSignupVerification,
+  resetPasswordWithCode,
+  type Session,
   updateAccountPassword,
+  verifySignupCode,
 } from "./sessionClient";
 import type { BuyerScale, Role } from "../types";
 
@@ -38,25 +40,14 @@ async function notifySupportOfSignup(details: {
   organization_name: string;
   user_id?: string;
 }) {
-  const base = import.meta.env.VITE_SUPABASE_URL;
-  const anon = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  const secret = import.meta.env.VITE_OKAVO_NOTIFY_SECRET;
-  if (!base || !anon || !secret) return;
-
+  const base = import.meta.env.VITE_OKAVO_API_URL;
+  if (!base) return;
   try {
-    await fetch(`${base}/functions/v1/notify-signup`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${anon}`,
-        apikey: anon,
-        "x-okavo-notify": secret,
-      },
-      body: JSON.stringify(details),
-    });
+    await fetch(`${base.replace(/\/$/, "")}/v1/health`);
   } catch {
-    // Never block signup if the support alert fails.
+    // Signup mail is sent by the Worker. This ping must not block the form.
   }
+  void details;
 }
 
 type AuthValue = {
@@ -75,8 +66,11 @@ type AuthValue = {
   signIn: (email: string, password: string) => Promise<void>;
   signOut: (reason?: "manual" | "idle") => Promise<void>;
   resendVerification: (email: string) => Promise<void>;
+  verifyEmail: (email: string, code: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  completeReset: (email: string, code: string, password: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
+  pendingVerification: string | null;
   demoSignIn: (role: Exclude<Role, "guest">, name: string) => void;
   clearMessages: () => void;
 };
@@ -118,7 +112,8 @@ const SCALE_TO_DB: Record<BuyerScale, string> = {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [initialDemoSession] = useState(readDemoSession);
-  const [ready, setReady] = useState(!isSupabaseConfigured);
+  const [ready, setReady] = useState(!isBackendConfigured);
+  const [pendingVerification, setPendingVerification] = useState<string | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [demoMode, setDemoMode] = useState(Boolean(initialDemoSession));
   const [role, setRole] = useState<Role>(initialDemoSession?.role ?? "guest");
@@ -134,65 +129,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * than during sign-up means it still works when email confirmation is on and
    * no session exists at sign-up time.
    */
-  const ensureProfile = useCallback(async (activeSession: Session) => {
-    const supabase = getSupabase();
-    if (!supabase) return;
-    const { user } = activeSession;
-    const meta = user.user_metadata ?? {};
-    const metaRole = meta.role;
-    // Never accept admin from the client. Admin is granted only in the database.
-    const desiredRole: Exclude<Role, "guest" | "admin"> =
-      metaRole === "developer" ? "developer" : "buyer";
-    const fullName = (meta.full_name as string) || user.email || "Okavo user";
-
-    const { data: existing, error: readError } = await supabase
-      .from("profiles")
-      .select("id, role, full_name")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (readError) {
-      setError(readError.message);
-      return;
+  const ensureProfile = useCallback(async (_activeSession: Session) => {
+    try {
+      const { profile } = await backend<{
+        profile: { role: string; full_name: string };
+      }>("/v1/me");
+      const storedRole = profile.role;
+      setRole(
+        storedRole === "developer" || storedRole === "admin" ? storedRole : "buyer"
+      );
+      setDisplayName(profile.full_name);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not load your profile.");
     }
-
-    if (!existing) {
-      const { error: insertError } = await supabase.from("profiles").insert({
-        id: user.id,
-        role: desiredRole,
-        full_name: fullName,
-        email: user.email,
-      });
-      if (insertError) {
-        setError(insertError.message);
-        return;
-      }
-
-      if (desiredRole === "buyer") {
-        await supabase.from("buyer_profiles").insert({
-          profile_id: user.id,
-          organization_name:
-            (meta.organization_name as string) || fullName,
-          scale: (meta.scale as string) || "local_business",
-        });
-      } else if (desiredRole === "developer") {
-        await supabase.from("developer_profiles").insert({
-          profile_id: user.id,
-          headline: "",
-          tier: "applicant",
-        });
-      }
-
-      setRole(desiredRole);
-      setDisplayName(fullName);
-      return;
-    }
-
-    const storedRole = existing.role;
-    setRole(
-      storedRole === "developer" || storedRole === "admin" ? storedRole : "buyer"
-    );
-    setDisplayName(existing.full_name);
   }, []);
 
   useEffect(() => {
@@ -200,7 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setReady(true);
       return;
     }
-    if (!isSupabaseConfigured) {
+    if (!isBackendConfigured) {
       setReady(true);
       return;
     }
@@ -208,8 +157,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const recovery =
       new URLSearchParams(window.location.search).get("recovery") === "1";
     if (recovery) setPasswordRecovery(true);
-    getSupabase();
-
     const unsubscribe = onMemorySessionChange((nextSession) => {
       setSession(nextSession);
       if (nextSession) {
@@ -255,8 +202,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           role: input.role,
         });
       } else {
+        setPendingVerification(input.email);
         setNotice(
-          `We sent a verification link to ${input.email}. Confirm the address, then sign in.`
+          `We sent a 6-digit confirmation code to ${input.email}. Enter it to finish creating the account.`
         );
       }
     } catch (signUpError) {
@@ -281,13 +229,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const verifyEmail = useCallback(async (email: string, code: string) => {
+    setError(null);
+    setNotice(null);
+    try {
+      await verifySignupCode(email, code);
+      setPendingVerification(null);
+      setNotice("Email confirmed. You are signed in.");
+    } catch (verifyError) {
+      setError(
+        verifyError instanceof Error ? verifyError.message : "That code did not work."
+      );
+    }
+  }, []);
+
   const resetPassword = useCallback(async (email: string) => {
     setError(null);
     setNotice(null);
     try {
       await requestPasswordRecovery(email);
+      setPasswordRecovery(true);
       setNotice(
-        `If an account exists for ${email}, we sent a link to choose a new password.`
+        `If an account exists for ${email}, we sent a 6-digit code to choose a new password.`
       );
     } catch (resetError) {
       setError(
@@ -298,11 +261,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const completeReset = useCallback(async (email: string, code: string, password: string) => {
+    setError(null);
+    setNotice(null);
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+    try {
+      await resetPasswordWithCode(email, code, password);
+      setPasswordRecovery(false);
+      setNotice("Password updated. Sign in with the new password.");
+    } catch (resetError) {
+      setError(
+        resetError instanceof Error ? resetError.message : "Could not reset your password."
+      );
+    }
+  }, []);
+
   const updatePassword = useCallback(async (password: string) => {
     setError(null);
     setNotice(null);
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
       return;
     }
     try {
@@ -376,7 +357,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       ready,
-      connected: isSupabaseConfigured,
+      connected: isBackendConfigured,
+      pendingVerification,
       demoMode,
       userId: session?.user.id ?? null,
       email: session?.user.email ?? null,
@@ -392,13 +374,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       signOut,
       resendVerification,
+      verifyEmail,
       resetPassword,
+      completeReset,
       updatePassword,
       demoSignIn,
       clearMessages,
     }),
     [
       ready,
+      pendingVerification,
       session,
       demoMode,
       role,
@@ -410,7 +395,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       signOut,
       resendVerification,
+      verifyEmail,
       resetPassword,
+      completeReset,
       updatePassword,
       demoSignIn,
       clearMessages,

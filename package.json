@@ -14,7 +14,8 @@
     "smoke": "node scripts/smoke-test.mjs",
     "rls": "node scripts/rls-matrix.mjs",
     "seed:accounts": "node scripts/seed-accounts.mjs",
-    "seed:test": "node scripts/seed-test-data.mjs"
+    "seed:test": "node scripts/seed-test-data.mjs",
+    "test": "node --test cloudflare/worker/test/pure.test.mjs"
   },
   "devDependencies": {
     "playwright": "^1.49.1"

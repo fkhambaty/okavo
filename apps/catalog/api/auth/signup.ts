@@ -1,39 +1,18 @@
-import {
-  assertAuthRateLimit,
-  assertCookieMutation,
-  authHeaders,
-  challengeFor,
-  clearPkceCookie,
-  json,
-  pkceCookie,
-  publicSession,
-  randomVerifier,
-  readSupabaseResponse,
-  redirectOrigin,
-  refreshCookie,
-  supabaseUrl,
-  upstreamError,
-  type PublicSession,
-} from "./_shared";
+import { assertCookieMutation, json, upstreamError, workerPost } from "./_shared";
 
 export const config = { runtime: "edge" };
-
-type SignupBody = {
-  email?: string;
-  password?: string;
-  data?: Record<string, unknown>;
-};
 
 export default async function handler(request: Request): Promise<Response> {
   const invalid = assertCookieMutation(request);
   if (invalid) return invalid;
 
-  const throttled = await assertAuthRateLimit(request, "signup", 10, 3600);
-  if (throttled) return throttled;
-
-  let input: SignupBody;
+  let input: { email?: string; password?: string; data?: Record<string, unknown> };
   try {
-    input = (await request.json()) as SignupBody;
+    input = (await request.json()) as {
+      email?: string;
+      password?: string;
+      data?: Record<string, unknown>;
+    };
   } catch {
     return json({ error: "Invalid request." }, { status: 400 });
   }
@@ -41,42 +20,16 @@ export default async function handler(request: Request): Promise<Response> {
     return json({ error: "Email and password are required." }, { status: 400 });
   }
 
-  const verifier = randomVerifier();
-  const challenge = await challengeFor(verifier);
-  const redirectTo = `${redirectOrigin(request)}/api/auth/callback`;
-  const response = await fetch(
-    `${supabaseUrl()}/auth/v1/signup?redirect_to=${encodeURIComponent(redirectTo)}`,
-    {
-      method: "POST",
-      headers: authHeaders(),
-      body: JSON.stringify({
-        email: input.email,
-        password: input.password,
-        data: input.data ?? {},
-        code_challenge: challenge,
-        code_challenge_method: "s256",
-      }),
-    }
+  const { response, payload } = await workerPost(
+    "/v1/auth/signup",
+    { email: input.email, password: input.password, data: input.data ?? {} },
+    request
   );
-  const body = await readSupabaseResponse(response);
-  if (!response.ok) return upstreamError(response, body);
-
-  if (
-    typeof body.access_token === "string" &&
-    typeof body.refresh_token === "string"
-  ) {
-    const session = body as PublicSession & { refresh_token: string };
-    const headers = new Headers();
-    headers.append("Set-Cookie", refreshCookie(request, session.refresh_token));
-    headers.append("Set-Cookie", clearPkceCookie(request));
-    return json(
-      { user: session.user, session: publicSession(session) },
-      { headers }
-    );
-  }
-
-  return json(
-    { user: body.user ?? body, session: null },
-    { headers: { "Set-Cookie": pkceCookie(request, verifier, "signup") } }
-  );
+  if (!response.ok) return upstreamError(response, payload);
+  return json({
+    user: payload.user ?? null,
+    session: null,
+    needs_verification: true,
+    email: payload.email,
+  });
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import * as api from "../../lib/api";
-import { isSupabaseConfigured } from "../../lib/supabase";
+import { isBackendConfigured as isSupabaseConfigured } from "../../lib/backend";
 import { errorMessage } from "../../lib/errors";
 
 export default function AdminVerifications() {

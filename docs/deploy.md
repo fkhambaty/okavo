@@ -1,14 +1,15 @@
 # Deploying Okavo
 
-**Live:** https://pro-catalog-nu.vercel.app
+**Live:** https://okavo.org
 **Vercel project:** `pro-catalog` (root directory `apps/catalog`)
-**Production Supabase:** `fzgnzaflvbimbiseqnrz`
-**Staging Supabase:** a separate project (set via `SUPABASE_PROJECT_REF` / secrets)
+**API:** Worker `okavo-api` at `https://okavo-api.fkhambaty.workers.dev`
+**Database:** Cloudflare D1 `okavo` (`3d3afb8e-1749-4c70-8001-e115504e3b03`)
 
-The app is a static single-page build (Vite) talking directly to Supabase.
-There is no server to run, so any static host works. Config for Vercel lives in
+The app is a static single-page build (Vite). The browser calls the Worker with a bearer token. Vercel `/api/auth` keeps the refresh cookie. The deleted Supabase project is not a runtime dependency. Config for Vercel lives in
 [vercel.json](../vercel.json); `apps/catalog/public/_redirects` covers Netlify
 and Cloudflare Pages.
+
+The sections below that name Supabase describe the 12 October 2026 deploy path.
 
 ## Environments
 

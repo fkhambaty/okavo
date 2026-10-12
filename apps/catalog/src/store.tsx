@@ -9,7 +9,7 @@ import {
 } from "react";
 import * as api from "./lib/api";
 import { useAuth } from "./lib/auth";
-import { isSupabaseConfigured } from "./lib/supabase";
+import { isBackendConfigured } from "./lib/backend";
 import { MEMBERSHIP_FEE_MINOR, POSTING_FEE_MINOR } from "./lib/pricing";
 import {
   NEW_DEVELOPER_ACCOUNT,
@@ -184,24 +184,24 @@ function defaultMilestones(total: number): Milestone[] {
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const auth = useAuth();
-  const live = isSupabaseConfigured && Boolean(auth.userId);
+  const live = isBackendConfigured && Boolean(auth.userId);
 
   // A configured backend must never render seeded demo rows: a real buyer
   // seeing another company's requirement is a privacy failure, not a preview.
   const [projects, setProjects] = useState<Project[]>(
-    isSupabaseConfigured ? [] : PROJECTS
+    isBackendConfigured ? [] : PROJECTS
   );
   const [threads, setThreads] = useState<Thread[]>(
-    isSupabaseConfigured ? [] : THREADS
+    isBackendConfigured ? [] : THREADS
   );
   const [notifications, setNotifications] = useState<AppNotification[]>(
-    isSupabaseConfigured ? [] : NOTIFICATIONS
+    isBackendConfigured ? [] : NOTIFICATIONS
   );
   const [developerAccount, setDeveloperAccount] = useState<DeveloperAccount>(
     NEW_DEVELOPER_ACCOUNT
   );
   const [loading, setLoading] = useState(false);
-  const [hydrated, setHydrated] = useState(!isSupabaseConfigured);
+  const [hydrated, setHydrated] = useState(!isBackendConfigured);
   const [error, setError] = useState<string | null>(null);
   const [postingFeesPaid, setPostingFeesPaid] = useState(0);
 
@@ -216,7 +216,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setHydrated(true);
       return;
     }
-    if (isSupabaseConfigured && !auth.userId) {
+    if (isBackendConfigured && !auth.userId) {
       setProjects([]);
       setThreads([]);
       setNotifications([]);
@@ -893,7 +893,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // With a backend, a buyer only ever sees requirements they own.
   const myProjects = useMemo(
     () =>
-      isSupabaseConfigured && !auth.demoMode
+      isBackendConfigured && !auth.demoMode
         ? projects.filter((project) => project.ownedByMe)
         : projects,
     [projects, auth.demoMode]
@@ -905,7 +905,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       name: auth.displayName,
       email: auth.email,
       userId: auth.userId,
-      connected: isSupabaseConfigured && !auth.demoMode,
+      connected: isBackendConfigured && !auth.demoMode,
       loading,
       hydrated,
       error,

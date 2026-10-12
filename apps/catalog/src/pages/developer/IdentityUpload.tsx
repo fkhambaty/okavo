@@ -1,7 +1,7 @@
 import { useState } from "react";
 import * as api from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { isSupabaseConfigured } from "../../lib/supabase";
+import { isBackendConfigured as isSupabaseConfigured } from "../../lib/backend";
 import { errorMessage } from "../../lib/errors";
 
 const DOCUMENT_TYPES = [

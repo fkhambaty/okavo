@@ -171,9 +171,9 @@ export default async function handler(req: Request): Promise<Response> {
     return new Response("Method not allowed", { status: 405, headers });
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceKey) {
+  const apiUrl = process.env.OKAVO_API_URL ?? process.env.VITE_OKAVO_API_URL;
+  const ingestSecret = process.env.ANALYTICS_INGEST_SECRET;
+  if (!apiUrl || !ingestSecret) {
     // Never fail the page over analytics.
     return new Response(null, { status: 204, headers });
   }
@@ -199,36 +199,6 @@ export default async function handler(req: Request): Promise<Response> {
     ua,
     process.env.ANALYTICS_SALT ?? "okavo"
   );
-
-  try {
-    const limitHash = await dailyVisitorId(
-      ip,
-      ua,
-      `${process.env.ANALYTICS_SALT ?? "okavo"}:rate`
-    );
-    const limitResponse = await fetch(
-      `${supabaseUrl}/rest/v1/rpc/consume_edge_rate_limit`,
-      {
-        method: "POST",
-        headers: {
-          apikey: serviceKey,
-          Authorization: `Bearer ${serviceKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          p_bucket_hash: limitHash,
-          p_limit: 120,
-          p_window_seconds: 60,
-        }),
-      }
-    );
-    if (limitResponse.ok && (await limitResponse.json()) !== true) {
-      return new Response(null, { status: 204, headers });
-    }
-  } catch {
-    // Analytics is best-effort; rate-limit infrastructure must not affect UI.
-    return new Response(null, { status: 204, headers });
-  }
 
   let referrerHost: string | null = null;
   if (beacon.referrer) {
@@ -273,13 +243,11 @@ export default async function handler(req: Request): Promise<Response> {
   };
 
   try {
-    await fetch(`${supabaseUrl}/rest/v1/site_visits`, {
+    await fetch(`${apiUrl.replace(/\/$/, "")}/v1/analytics/collect`, {
       method: "POST",
       headers: {
-        apikey: serviceKey,
-        Authorization: `Bearer ${serviceKey}`,
         "Content-Type": "application/json",
-        Prefer: "return=minimal",
+        "x-okavo-ingest": ingestSecret,
       },
       body: JSON.stringify(row),
     });

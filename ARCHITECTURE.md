@@ -2,6 +2,30 @@
 
 Written 12 October 2026 so a different AI on a different computer can work without this chat.
 
+## Backend as of 13 October 2026
+
+Production no longer uses Supabase. The project `fzgnzaflvbimbiseqnrz` was deleted. Accounts, marketplace rows, and payment records live in the existing Cloudflare D1 database `okavo` (`3d3afb8e-1749-4c70-8001-e115504e3b03`) on account `ec00d4a6131c20118d82605d6b969c8e`. The API is the Worker `okavo-api` at `https://okavo-api.fkhambaty.workers.dev` (`cloudflare/worker`). The browser calls that Worker with a short-lived bearer token. The Vercel `/api/auth` routes still own the HttpOnly refresh cookie and never put the session in `localStorage`.
+
+Signup does not create a session until a 6-digit email code is confirmed. Password reset uses the same kind of code. Sending those codes requires the `okavo.org` domain to be verified in Resend. On 13 October 2026 Resend rejected `Okavo <support@okavo.org>` with “The okavo.org domain is not verified.” Until that domain is verified, signup and password-reset return an error and do not create a session. A profile inserted directly in D1 with `email_verified_at` set can still log in. The Worker chooses Razorpay amounts. A payment is marked paid only after a verified signature and, when live charges are switched on, a captured Razorpay payment whose amount matches the stored order. `RAZORPAY_PAYMENTS_ENABLED` stays `false` unless a real `rzp_` key is configured, so order creation does not call Razorpay and does not charge anyone. The dummy login (`dummy` / `dummy`) stays in the browser, uses fixture rows, and never calls the Worker or Razorpay.
+
+```
+Browser
+  → Vercel (okavo.org) static app
+  → Vercel /api/auth (HttpOnly refresh cookie; access token stays in memory)
+  → Worker https://okavo-api.fkhambaty.workers.dev
+  → D1 database okavo
+```
+
+These routes are intentionally unimplemented and return an error instead of invented data:
+
+- Identity document and payment-proof file storage (no object bucket is configured).
+- Starting, scoring, or deciding a build exam. The exam queue is empty and starts are paused.
+- Requirement-assist language models. The page keeps the local heuristic only.
+- Stripe checkout, the Razorpay reconcile cron, and the identity-retention sweep.
+- Passwordless operator tokens. `scripts/okavo.mjs` database commands no longer talk to Supabase.
+
+Older sections below that name Supabase describe the system as it was on 12 October 2026.
+
 Read this file, then `AGENTS.md`. `docs/architecture/forma-platform.md` is an older thesis from when the product was called FORMA. The running product is Okavo. Do not rename it back, and do not treat that thesis as the schema.
 
 ## What it is

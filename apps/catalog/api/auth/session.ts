@@ -2,11 +2,10 @@ import {
   assertCookieMutation,
   clearRefreshCookie,
   json,
-  publicSession,
-  refreshCookie,
-  refreshSession,
+  refreshToken,
+  sessionResponse,
   upstreamError,
-  type PublicSession,
+  workerPost,
 } from "./_shared";
 
 export const config = { runtime: "edge" };
@@ -15,16 +14,17 @@ export default async function handler(request: Request): Promise<Response> {
   const invalid = assertCookieMutation(request);
   if (invalid) return invalid;
 
-  const { response, body } = await refreshSession(request);
+  const token = refreshToken(request);
+  if (!token) {
+    return json({ error: "Sign in again." }, { status: 401 });
+  }
+  const { response, payload } = await workerPost("/v1/auth/refresh", {
+    refresh_token: token,
+  });
   if (!response.ok) {
-    const error = upstreamError(response, body);
+    const error = upstreamError(response, payload);
     error.headers.append("Set-Cookie", clearRefreshCookie(request));
     return error;
   }
-
-  const session = body as PublicSession & { refresh_token: string };
-  return json(
-    { session: publicSession(session) },
-    { headers: { "Set-Cookie": refreshCookie(request, session.refresh_token) } }
-  );
+  return sessionResponse(request, payload);
 }

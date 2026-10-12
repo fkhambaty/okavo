@@ -8,7 +8,7 @@ import Meter from "../../components/charts/Meter";
 import { money } from "../../format";
 import * as api from "../../lib/api";
 import { adminComposition } from "../../lib/roleAnalytics";
-import { isSupabaseConfigured } from "../../lib/supabase";
+import { isBackendConfigured as isSupabaseConfigured } from "../../lib/backend";
 import { errorMessage } from "../../lib/errors";
 import type { TrendPoint } from "../../lib/chartMath";
 

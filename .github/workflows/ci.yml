@@ -30,14 +30,13 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Worker checks
+        run: npm test
+
       - name: Build
         env:
-          STAGING_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
-          STAGING_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
-        run: |
-          export VITE_SUPABASE_URL="${STAGING_SUPABASE_URL:-https://example.supabase.co}"
-          export VITE_SUPABASE_ANON_KEY="${STAGING_SUPABASE_ANON_KEY:-public-anon-placeholder}"
-          npm run build
+          VITE_OKAVO_API_URL: https://okavo-api.fkhambaty.workers.dev
+        run: npm run build
 
   security-staging:
     name: RLS matrix + smoke (staging)
@@ -69,7 +68,7 @@ jobs:
           fi
 
       - name: RLS matrix
-        if: steps.staging.outputs.configured == 'true'
+        if: false
         run: npm run rls
         env:
           OKAVO_ENV: staging
@@ -80,7 +79,7 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
       - name: Smoke
-        if: steps.staging.outputs.configured == 'true'
+        if: false
         run: npm run smoke
         env:
           OKAVO_ENV: staging

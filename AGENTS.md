@@ -8,11 +8,10 @@ scope. Live at <https://okavo.org>.
 
 ## Environments
 
-| Environment | Supabase | When to use |
+| Environment | Backend | When to use |
 |-------------|----------|-------------|
-| **Production** | `fzgnzaflvbimbiseqnrz` | Live site; **read-only** agent console |
-| **Staging** | separate project (set `SUPABASE_PROJECT_REF`) | Seeds, smoke, RLS matrix, CI |
-| **Local** | `supabase start` → `http://127.0.0.1:54321` | Offline migration work |
+| **Production** | Cloudflare D1 `okavo` via Worker `okavo-api` | Live site at okavo.org |
+| **Local** | same Worker URL in `VITE_OKAVO_API_URL`, or fixtures when it is unset | UI work. Dummy login never hits the Worker |
 
 Copy [`scripts/env.example`](scripts/env.example) to `.okavo-agent` (or
 `.env.local`) and [`apps/catalog/env.example`](apps/catalog/env.example) to

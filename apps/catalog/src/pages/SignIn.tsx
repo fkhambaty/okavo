@@ -55,6 +55,7 @@ export default function SignIn() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [code, setCode] = useState("");
   const [fullName, setFullName] = useState("");
   const [organization, setOrganization] = useState("");
   const [scale] = useState<BuyerScale>("Local business");
@@ -139,24 +140,30 @@ export default function SignIn() {
     setBusy(false);
   }
 
-  async function saveNewPassword() {
-    setBusy(true);
-    await auth.updatePassword(newPassword);
-    setBusy(false);
-  }
-
   if (auth.passwordRecovery) {
     return (
       <AuthFrame
         kicker="Account"
         title="Choose a new password."
         points={[
-          `This replaces the password for ${auth.email ?? "your account"}.`,
-          "Use at least 6 characters.",
+          `This replaces the password for ${email || auth.email || "your account"}.`,
+          "Use the 6-digit code from the email and a password of at least 8 characters.",
         ]}
       >
           <h1>Choose a new password</h1>
-          <p>Enter a new password for {auth.email ?? "your account"}.</p>
+          <p>Enter the code we emailed and a new password.</p>
+
+          <div className="field">
+            <label htmlFor="resetCode">Reset code</label>
+            <input
+              id="resetCode"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+              placeholder="6-digit code"
+            />
+          </div>
 
           <div className="field">
             <label htmlFor="newPassword">New password</label>
@@ -166,7 +173,7 @@ export default function SignIn() {
               autoComplete="new-password"
               value={newPassword}
               onChange={(event) => setNewPassword(event.target.value)}
-              placeholder="At least 6 characters"
+              placeholder="At least 8 characters"
             />
           </div>
 
@@ -187,8 +194,13 @@ export default function SignIn() {
           <button
             type="button"
             className="btn btn-block btn-lg"
-            onClick={saveNewPassword}
-            disabled={busy || newPassword.length < 6}
+            onClick={() => {
+              setBusy(true);
+              void auth.completeReset(email.trim(), code.trim(), newPassword).finally(() =>
+                setBusy(false)
+              );
+            }}
+            disabled={busy || newPassword.length < 8 || code.trim().length < 6}
           >
             {busy ? "Working…" : "Save password"}
           </button>
@@ -205,8 +217,8 @@ export default function SignIn() {
         <h1>{mode === "signin" ? "Sign in to Okavo" : "Create your account"}</h1>
         <p>
           {auth.connected
-            ? "Connected to your Supabase project."
-            : "Demo mode — add Supabase keys to enable real accounts."}
+            ? "Accounts are confirmed with an email code before they can sign in."
+            : "Demo mode — the live account service is not configured in this build."}
         </p>
 
         {auth.connected && (
@@ -289,7 +301,7 @@ export default function SignIn() {
                 }
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                placeholder="At least 6 characters"
+                placeholder="At least 8 characters"
               />
             </div>
           </>
@@ -318,6 +330,20 @@ export default function SignIn() {
               </div>
             )}
           </>
+        )}
+
+        {auth.pendingVerification && (
+          <div className="field">
+            <label htmlFor="verifyCode">Confirmation code</label>
+            <input
+              id="verifyCode"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+              placeholder="6-digit code from your email"
+            />
+          </div>
         )}
 
         {auth.error && (
@@ -378,7 +404,7 @@ export default function SignIn() {
             disabled={!email.trim() || busy}
             onClick={requestReset}
           >
-            Forgot password? Email me a reset link
+            Forgot password? Email me a reset code
           </button>
         )}
 
@@ -389,7 +415,23 @@ export default function SignIn() {
             disabled={!email.trim() || busy}
             onClick={() => auth.resendVerification(email.trim())}
           >
-            Didn&apos;t get the verification email? Send it again
+            Didn&apos;t get the verification email? Send the code again
+          </button>
+        )}
+
+        {auth.pendingVerification && (
+          <button
+            type="button"
+            className="btn btn-block"
+            disabled={busy || code.trim().length < 6}
+            onClick={() => {
+              setBusy(true);
+              void auth
+                .verifyEmail(auth.pendingVerification ?? email.trim(), code.trim())
+                .finally(() => setBusy(false));
+            }}
+          >
+            {busy ? "Working…" : "Confirm email"}
           </button>
         )}
 

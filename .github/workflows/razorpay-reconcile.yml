@@ -20,16 +20,9 @@ jobs:
     steps:
       - name: Detect secrets
         id: secrets
-        env:
-          PROD_SUPABASE_URL: ${{ secrets.PROD_SUPABASE_URL }}
-          RAZORPAY_RECONCILE_SECRET: ${{ secrets.RAZORPAY_RECONCILE_SECRET }}
         run: |
-          if [ -n "$PROD_SUPABASE_URL" ] && [ -n "$RAZORPAY_RECONCILE_SECRET" ]; then
-            echo "configured=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "PROD_SUPABASE_URL / RAZORPAY_RECONCILE_SECRET not set — skipping."
-          fi
+          echo "configured=false" >> "$GITHUB_OUTPUT"
+          echo "Supabase reconcile was retired on 13 October 2026. The Worker does not settle payments from this job."
 
       - name: Invoke razorpay-reconcile
         if: steps.secrets.outputs.configured == 'true'

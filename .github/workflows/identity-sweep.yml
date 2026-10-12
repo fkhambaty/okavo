@@ -22,16 +22,9 @@ jobs:
     steps:
       - name: Detect secrets
         id: secrets
-        env:
-          PROD_SUPABASE_URL: ${{ secrets.PROD_SUPABASE_URL }}
-          IDENTITY_SWEEP_SECRET: ${{ secrets.IDENTITY_SWEEP_SECRET }}
         run: |
-          if [ -n "$PROD_SUPABASE_URL" ] && [ -n "$IDENTITY_SWEEP_SECRET" ]; then
-            echo "configured=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "PROD_SUPABASE_URL / IDENTITY_SWEEP_SECRET not set — skipping sweep."
-          fi
+          echo "configured=false" >> "$GITHUB_OUTPUT"
+          echo "Supabase identity sweep was retired on 13 October 2026. Document storage is not configured on D1."
 
       - name: Invoke identity-retention-sweep
         if: steps.secrets.outputs.configured == 'true'

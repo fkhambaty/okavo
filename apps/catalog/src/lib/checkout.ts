@@ -1,6 +1,6 @@
 import { logAudit } from "./audit";
+import { apiBase } from "./backend";
 import { getAccessToken } from "./sessionClient";
-import { getSupabase } from "./supabase";
 
 export type CheckoutPurpose =
   | "requirement_posting"
@@ -49,18 +49,17 @@ function loadCheckout(): Promise<boolean> {
  * Polls our payments row after confirm/webhook. Confirm is primary; this only
  * covers a race where confirm returns before the row is visible to the client.
  */
-async function waitForSettlement(paymentId: string): Promise<boolean> {
-  const supabase = getSupabase();
-  if (!supabase) return false;
-
+async function waitForSettlement(paymentId: string, token: string, base: string): Promise<boolean> {
   for (let attempt = 0; attempt < 8; attempt += 1) {
-    const { data } = await supabase
-      .from("payments")
-      .select("status")
-      .eq("id", paymentId)
-      .maybeSingle();
-
-    if (data?.status === "paid") return true;
+    try {
+      const response = await fetch(`${base}/v1/payments/${paymentId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = (await response.json()) as { status?: string };
+      if (data.status === "paid") return true;
+    } catch {
+      // Keep polling; the confirmer may still be writing the row.
+    }
     await new Promise((resolve) => setTimeout(resolve, 750));
   }
   return false;
@@ -77,12 +76,11 @@ async function confirmPayment(
   }
 ): Promise<{ ok: boolean; message?: string }> {
   try {
-    const response = await fetch(`${base}/functions/v1/razorpay-confirm`, {
+    const response = await fetch(`${base}/v1/payments/razorpay/confirm`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
-        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY ?? "",
       },
       body: JSON.stringify(body),
     });
@@ -118,9 +116,8 @@ export async function collectFee(
   buyer?: { name?: string; email?: string | null },
   options?: { bidId?: string }
 ): Promise<CheckoutResult> {
-  const base = import.meta.env.VITE_SUPABASE_URL;
-  const supabase = getSupabase();
-  if (!supabase || !base) {
+  const base = apiBase();
+  if (!base) {
     return { status: "error", message: "Payments are unavailable in demo mode." };
   }
 
@@ -139,12 +136,11 @@ export async function collectFee(
   };
 
   try {
-    const response = await fetch(`${base}/functions/v1/razorpay-order`, {
+    const response = await fetch(`${base}/v1/payments/razorpay/order`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
-        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY ?? "",
       },
       body: JSON.stringify({
         purpose,
@@ -220,13 +216,13 @@ export async function collectFee(
           });
 
           if (confirmed.ok) {
-            const paid = await waitForSettlement(order.paymentId);
+            const paid = await waitForSettlement(order.paymentId, token, base);
             finish(paid || confirmed.ok ? { status: "paid" } : { status: "pending" });
             return;
           }
 
           // Webhook may still settle; wait briefly before reporting pending.
-          const paid = await waitForSettlement(order.paymentId);
+          const paid = await waitForSettlement(order.paymentId, token, base);
           if (paid) {
             finish({ status: "paid" });
             return;

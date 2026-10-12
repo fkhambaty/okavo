@@ -1,11 +1,26 @@
-import type { Session, User } from "@supabase/supabase-js";
+export type AccountUser = {
+  id: string;
+  email?: string;
+  email_confirmed_at?: string | null;
+  confirmed_at?: string | null;
+  user_metadata?: Record<string, unknown>;
+};
+
+export type Session = {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  expires_in: number;
+  expires_at: number;
+  user: AccountUser;
+};
 
 type PublicSession = {
   access_token: string;
   token_type: "bearer";
   expires_in: number;
   expires_at: number;
-  user: User;
+  user: AccountUser;
 };
 
 type SessionListener = (session: Session | null) => void;
@@ -18,7 +33,6 @@ const listeners = new Set<SessionListener>();
 function asSession(session: PublicSession): Session {
   return {
     access_token: session.access_token,
-    // The real refresh token exists only in the HttpOnly cookie.
     refresh_token: "",
     token_type: session.token_type,
     expires_in: session.expires_in,
@@ -87,58 +101,43 @@ export async function getAccessToken(): Promise<string | null> {
   return currentSession?.access_token ?? null;
 }
 
-/**
- * Calls GoTrue directly for the two operations the receptionist does not own.
- * The Supabase client cannot be used: passing `accessToken` to createClient
- * makes its `auth` namespace throw on every access.
- */
-async function gotrue<T>(
-  path: string,
-  init: { method: string; body: Record<string, unknown>; token?: string }
-): Promise<T> {
-  const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-  if (!url || !anonKey) throw new Error("Authentication is not configured.");
-
-  const response = await fetch(`${url}/auth/v1/${path}`, {
-    method: init.method,
-    headers: {
-      "Content-Type": "application/json",
-      apikey: anonKey,
-      ...(init.token ? { Authorization: `Bearer ${init.token}` } : {}),
-    },
-    body: JSON.stringify(init.body),
-  });
-
-  const payload = (await response.json().catch(() => ({}))) as {
-    msg?: string;
-    message?: string;
-    error_description?: string;
-  };
-  if (!response.ok) {
-    throw new Error(
-      payload.msg ??
-        payload.error_description ??
-        payload.message ??
-        "Authentication request failed."
-    );
-  }
-  return payload as T;
+export async function resendSignupVerification(email: string): Promise<void> {
+  await request("/api/auth/resend", { email });
 }
 
-export async function resendSignupVerification(email: string): Promise<void> {
-  await gotrue("resend", {
-    method: "POST",
-    body: { type: "signup", email },
+export async function verifySignupCode(email: string, code: string): Promise<Session> {
+  const { session } = await request<{ session: PublicSession }>("/api/auth/verify", {
+    email,
+    code,
   });
+  return publish(asSession(session)) as Session;
+}
+
+export async function resetPasswordWithCode(
+  email: string,
+  code: string,
+  password: string
+): Promise<void> {
+  await request("/api/auth/reset", { email, code, password });
 }
 
 export async function updateAccountPassword(password: string): Promise<void> {
   const token = await getAccessToken();
   if (!token) {
-    throw new Error("Your reset link has expired. Request a new one.");
+    throw new Error("Sign in again before changing your password.");
   }
-  await gotrue("user", { method: "PUT", body: { password }, token });
+  const base = import.meta.env.VITE_OKAVO_API_URL as string | undefined;
+  if (!base) throw new Error("Authentication is not configured.");
+  const response = await fetch(`${base.replace(/\/$/, "")}/v1/auth/password`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ password }),
+  });
+  const payload = (await response.json().catch(() => ({}))) as { error?: string };
+  if (!response.ok) throw new Error(payload.error ?? "Could not update your password.");
 }
 
 export async function receptionistSignIn(
@@ -156,14 +155,19 @@ export async function receptionistSignUp(input: {
   email: string;
   password: string;
   data: Record<string, unknown>;
-}): Promise<{ user: User | null; session: Session | null }> {
+}): Promise<{ user: AccountUser | null; session: Session | null; needsVerification: boolean }> {
   const result = await request<{
-    user: User | null;
+    user: AccountUser | null;
     session: PublicSession | null;
+    needs_verification?: boolean;
   }>("/api/auth/signup", input);
   const session = result.session ? asSession(result.session) : null;
   publish(session);
-  return { user: result.user, session };
+  return {
+    user: result.user,
+    session,
+    needsVerification: Boolean(result.needs_verification),
+  };
 }
 
 export async function receptionistSignOut(): Promise<void> {

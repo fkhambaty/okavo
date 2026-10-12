@@ -1,8 +1,6 @@
 const REFRESH_COOKIE = "okavo-refresh";
-const PKCE_COOKIE = "okavo-pkce";
 const COOKIE_PATH = "/";
 const REFRESH_MAX_AGE = 60 * 60 * 24 * 30;
-const PKCE_MAX_AGE = 60 * 60;
 
 export type PublicSession = {
   access_token: string;
@@ -12,31 +10,19 @@ export type PublicSession = {
   user: Record<string, unknown>;
 };
 
-type SupabaseSession = PublicSession & {
+type WorkerSession = PublicSession & {
   refresh_token: string;
 };
 
-function env(name: "SUPABASE_URL" | "SUPABASE_ANON_KEY"): string {
-  const value =
-    process.env[name] ??
-    process.env[`VITE_${name}` as "VITE_SUPABASE_URL" | "VITE_SUPABASE_ANON_KEY"];
-  if (!value) throw new Error(`Missing ${name}`);
+function isLocalRequest(request: Request): boolean {
+  const host = request.headers.get("host") ?? "";
+  return host.startsWith("localhost:") || host.startsWith("127.0.0.1:");
+}
+
+export function workerUrl(): string {
+  const value = process.env.OKAVO_API_URL ?? process.env.VITE_OKAVO_API_URL;
+  if (!value) throw new Error("Missing OKAVO_API_URL");
   return value.replace(/\/$/, "");
-}
-
-export function supabaseUrl(): string {
-  return env("SUPABASE_URL");
-}
-
-export function anonKey(): string {
-  return env("SUPABASE_ANON_KEY");
-}
-
-export function authHeaders(extra?: HeadersInit): Headers {
-  const headers = new Headers(extra);
-  headers.set("apikey", anonKey());
-  headers.set("Content-Type", "application/json");
-  return headers;
 }
 
 export function parseCookies(request: Request): Map<string, string> {
@@ -51,17 +37,7 @@ export function parseCookies(request: Request): Map<string, string> {
   return result;
 }
 
-function isLocalRequest(request: Request): boolean {
-  const host = request.headers.get("host") ?? "";
-  return host.startsWith("localhost:") || host.startsWith("127.0.0.1:");
-}
-
-function cookie(
-  request: Request,
-  name: string,
-  value: string,
-  maxAge: number
-): string {
+function cookie(request: Request, name: string, value: string, maxAge: number): string {
   const secure = isLocalRequest(request) ? "" : "; Secure";
   return `${name}=${encodeURIComponent(value)}; Path=${COOKIE_PATH}; HttpOnly${secure}; SameSite=Lax; Max-Age=${maxAge}`;
 }
@@ -74,40 +50,11 @@ export function clearRefreshCookie(request: Request): string {
   return cookie(request, REFRESH_COOKIE, "", 0);
 }
 
-export function pkceCookie(
-  request: Request,
-  verifier: string,
-  purpose: "recovery" | "signup"
-): string {
-  return cookie(
-    request,
-    PKCE_COOKIE,
-    `${purpose}.${verifier}`,
-    PKCE_MAX_AGE
-  );
-}
-
-export function clearPkceCookie(request: Request): string {
-  return cookie(request, PKCE_COOKIE, "", 0);
-}
-
 export function refreshToken(request: Request): string | null {
   return parseCookies(request).get(REFRESH_COOKIE) ?? null;
 }
 
-export function pkceVerifier(request: Request): string | null {
-  const value = parseCookies(request).get(PKCE_COOKIE);
-  return value?.split(".", 2)[1] ?? null;
-}
-
-export function pkcePurpose(
-  request: Request
-): "recovery" | "signup" | null {
-  const purpose = parseCookies(request).get(PKCE_COOKIE)?.split(".", 1)[0];
-  return purpose === "recovery" || purpose === "signup" ? purpose : null;
-}
-
-export function publicSession(session: SupabaseSession): PublicSession {
+export function publicSession(session: WorkerSession): PublicSession {
   return {
     access_token: session.access_token,
     token_type: session.token_type,
@@ -118,10 +65,7 @@ export function publicSession(session: SupabaseSession): PublicSession {
   };
 }
 
-export function json(
-  body: unknown,
-  init: ResponseInit = {}
-): Response {
+export function json(body: unknown, init: ResponseInit = {}): Response {
   const headers = new Headers(init.headers);
   headers.set("Content-Type", "application/json; charset=utf-8");
   headers.set("Cache-Control", "no-store");
@@ -129,24 +73,33 @@ export function json(
   return new Response(JSON.stringify(body), { ...init, headers });
 }
 
-export async function readSupabaseResponse(
-  response: Response
-): Promise<Record<string, unknown>> {
-  try {
-    return (await response.json()) as Record<string, unknown>;
-  } catch {
-    return {};
-  }
+export function clientIp(request: Request): string {
+  return (
+    request.headers.get("x-real-ip") ??
+    (request.headers.get("x-forwarded-for") ?? "").split(",")[0]?.trim() ??
+    "unknown"
+  );
 }
 
-export function upstreamError(
-  response: Response,
-  body: Record<string, unknown>
-): Response {
+export async function workerPost(
+  path: string,
+  body: Record<string, unknown>,
+  request?: Request
+): Promise<{ response: Response; payload: Record<string, unknown> }> {
+  const headers = new Headers({ "Content-Type": "application/json" });
+  if (request) headers.set("x-okavo-client-ip", clientIp(request));
+  const response = await fetch(`${workerUrl()}${path}`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
+  const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+  return { response, payload };
+}
+
+export function upstreamError(response: Response, body: Record<string, unknown>): Response {
   const message =
-    (typeof body.error_description === "string" && body.error_description) ||
-    (typeof body.msg === "string" && body.msg) ||
-    (typeof body.message === "string" && body.message) ||
+    (typeof body.error === "string" && body.error) ||
     "Authentication request failed.";
   return json({ error: message }, { status: response.status });
 }
@@ -181,126 +134,13 @@ export function assertCookieMutation(request: Request): Response | null {
   return null;
 }
 
-export async function refreshSession(
-  request: Request
-): Promise<{ response: Response; body: Record<string, unknown> }> {
-  const token = refreshToken(request);
-  if (!token) {
-    const response = new Response(null, { status: 401 });
-    return { response, body: {} };
-  }
-  const response = await fetch(
-    `${supabaseUrl()}/auth/v1/token?grant_type=refresh_token`,
-    {
-      method: "POST",
-      headers: authHeaders(),
-      body: JSON.stringify({ refresh_token: token }),
-    }
-  );
-  return { response, body: await readSupabaseResponse(response) };
-}
-
-export function randomVerifier(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  return base64Url(bytes);
-}
-
-export async function challengeFor(verifier: string): Promise<string> {
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(verifier)
-  );
-  return base64Url(new Uint8Array(digest));
-}
-
-function base64Url(bytes: Uint8Array): string {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-}
-
-export function redirectOrigin(request: Request): string {
-  const configured = process.env.PUBLIC_SITE_URL;
-  if (configured) return configured.replace(/\/$/, "");
-  const host =
-    request.headers.get("x-forwarded-host") ?? request.headers.get("host");
-  const protocol =
-    request.headers.get("x-forwarded-proto") ??
-    (isLocalRequest(request) ? "http" : "https");
-  if (!host) throw new Error("Missing request host");
-  return `${protocol}://${host}`;
-}
-
-function requestIp(request: Request): string {
-  return (
-    request.headers.get("x-real-ip") ??
-    (request.headers.get("x-forwarded-for") ?? "").split(",")[0]?.trim() ??
-    "unknown"
-  );
-}
-
-async function sha256Hex(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(value)
-  );
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-/**
- * Postgres-backed auth throttle. Uses the same service-role RPC as analytics.
- * When the service role is absent (local without secrets), the check is skipped
- * so developers can still sign in.
- */
-export async function assertAuthRateLimit(
+export function sessionResponse(
   request: Request,
-  scope: "login" | "signup" | "recovery",
-  limit: number,
-  windowSeconds: number
-): Promise<Response | null> {
-  const supabaseBase = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseBase || !serviceKey) return null;
-
-  try {
-    const salt = process.env.RATE_LIMIT_SALT ?? "okavo-edge-v1";
-    const actor = requestIp(request);
-    const bucketHash = await sha256Hex(`${salt}:auth-${scope}:${actor}`);
-    const response = await fetch(
-      `${supabaseBase.replace(/\/$/, "")}/rest/v1/rpc/consume_edge_rate_limit`,
-      {
-        method: "POST",
-        headers: {
-          apikey: serviceKey,
-          Authorization: `Bearer ${serviceKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          p_bucket_hash: bucketHash,
-          p_limit: limit,
-          p_window_seconds: windowSeconds,
-        }),
-      }
-    );
-    if (!response.ok) return null;
-    const allowed = await response.json();
-    if (allowed === true) return null;
-    return json(
-      {
-        error: "Too many authentication attempts. Please try again shortly.",
-        retry_after_seconds: windowSeconds,
-      },
-      {
-        status: 429,
-        headers: { "Retry-After": String(windowSeconds) },
-      }
-    );
-  } catch {
-    return null;
-  }
+  payload: Record<string, unknown>
+): Response {
+  const session = payload as WorkerSession;
+  return json(
+    { session: publicSession(session) },
+    { headers: { "Set-Cookie": refreshCookie(request, session.refresh_token) } }
+  );
 }

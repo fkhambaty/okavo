@@ -1,4 +1,4 @@
-import { getSupabase } from "./supabase";
+import { backend, isBackendConfigured } from "./backend";
 
 export type AuditAction =
   | "auth.sign_in"
@@ -36,19 +36,18 @@ export function logAudit(
   entityId?: string | null,
   detail?: Record<string, unknown>
 ): void {
-  const client = getSupabase();
-  if (!client) return;
+  if (!isBackendConfigured) return;
 
-  void client
-    .rpc("write_audit_event", {
-      p_action: action,
-      p_entity_type: entityType,
-      p_entity_id: entityId ?? null,
-      p_detail: detail ?? {},
-    })
-    .then(({ error }) => {
-      if (error && import.meta.env.DEV) {
-        console.warn("audit log failed", action, error.message);
-      }
-    });
+  void backend("/v1/audit", {
+    body: {
+      action,
+      entity_type: entityType,
+      entity_id: entityId ?? null,
+      detail: detail ?? {},
+    },
+  }).catch((error: unknown) => {
+    if (import.meta.env.DEV) {
+      console.warn("audit log failed", action, error);
+    }
+  });
 }

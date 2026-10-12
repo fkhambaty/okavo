@@ -81,23 +81,19 @@ function screens() {
 // Commands
 // ---------------------------------------------------------------------------
 
+function retired(command) {
+  fail(
+    `${command} targeted the deleted Supabase project. Accounts and rows now live in Cloudflare D1 behind the Worker. This console does not mint sessions or bypass that API.`
+  );
+}
+
 const commands = {
   async check() {
-    const rows = [
-      ["SUPABASE_ACCESS_TOKEN", conf("SUPABASE_ACCESS_TOKEN")],
-      ["SUPABASE_SERVICE_ROLE_KEY", conf("SUPABASE_SERVICE_ROLE_KEY")],
-      ["SUPABASE_ANON_KEY", conf("SUPABASE_ANON_KEY") ?? conf("VITE_SUPABASE_ANON_KEY")],
-    ];
-    for (const [key, value] of rows) {
-      console.log(`${value ? "✓" : "✗"} ${key}${value ? ` (${value.slice(0, 8)}…)` : " missing"}`);
-    }
-    console.log(`\nsite: ${SITE_URL}`);
-    console.log(`project: ${PROJECT_REF}`);
-    console.log(`url: ${SUPABASE_URL}`);
-    console.log(`env: ${target.envName}${target.isProduction ? " (production)" : ""}`);
+    retired("check");
   },
 
   async accounts() {
+    retired("accounts");
     const rows = await managementSql(target, `
       select u.email,
              coalesce(p.role::text, 'no profile') as role,
@@ -119,7 +115,9 @@ const commands = {
     out(screens());
   },
 
-  async token([email]) {
+  async token() {
+    retired("token");
+    const email = "";
     if (!email) fail("Usage: token <email>");
     const session = await sessionFor(target, email);
     out({
@@ -131,7 +129,10 @@ const commands = {
   },
 
   /** Read any table with the service role. Row-level security does not apply. */
-  async db([table, query]) {
+  async db() {
+    retired("db");
+    const table = "";
+    const query = "";
     if (!table) fail('Usage: db <table> ["select=*&limit=5"]');
     const qs = query ?? "select=*&limit=20";
     const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${qs}`, {
@@ -142,7 +143,9 @@ const commands = {
     out(JSON.parse(body));
   },
 
-  async sql(args) {
+  async sql() {
+    retired("sql");
+    const args = [];
     const query = args.join(" ");
     if (!query) fail('Usage: sql "select count(*) from projects"');
     out(await managementSql(target, query));
@@ -152,7 +155,9 @@ const commands = {
    * Call the API as a real user, with row-level security applied. This is the
    * command that answers "what can this person actually see?".
    */
-  async as(args) {
+  async as() {
+    retired("as");
+    const args = [];
     const [email, method = "GET", path, ...rest] = args;
     if (!email || !path) {
       fail('Usage: as <email> <GET|POST|PATCH|DELETE> <path> [json]\n' +
@@ -182,6 +187,7 @@ const commands = {
     const path = args[0] ?? "/";
     const asIndex = args.indexOf("--as");
     const email = asIndex === -1 ? null : args[asIndex + 1];
+    if (email) retired("shot --as");
     const file = `/tmp/okavo${path.replace(/[^\w]+/g, "-")}${email ? `-${email.split("@")[0]}` : ""}.png`;
 
     let chromium;
@@ -227,14 +233,10 @@ const commands = {
     console.log(`
 Okavo agent console
 
-  check                          Show which credentials are configured
-  accounts                       Every user, their role and verification state
   screens                        Every route and who is allowed to see it
-  token <email>                  Session token for any account (no password)
-  as <email> <METHOD> <path>     Call the API as that user, RLS applied
-  db <table> [query]             Read a table with the service role, RLS bypassed
-  sql "<query>"                  Run SQL against the database
-  shot <path> [--as <email>]     Screenshot a screen as that user
+  shot <path>                    Screenshot a public screen
+  check, accounts, token, as, db, sql, shot --as
+                                 Retired. They talked to the deleted Supabase project.
 
 Examples
 

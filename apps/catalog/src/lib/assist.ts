@@ -89,64 +89,11 @@ export function heuristicAssist(input: AssistInput): AssistResult {
   };
 }
 
-function parseAssistPayload(body: unknown): AssistResult | null {
-  if (!body || typeof body !== "object") return null;
-  const row = body as Record<string, unknown>;
-  if (!Array.isArray(row.suggestions)) return null;
-  return {
-    available: row.available !== false,
-    mode:
-      row.mode === "llm" || row.mode === "heuristic" || row.mode === "unavailable"
-        ? row.mode
-        : "heuristic",
-    summary:
-      typeof row.summary === "string"
-        ? row.summary
-        : "Suggestions grounded in your draft.",
-    suggestions: row.suggestions
-      .filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
-      .map((item, index): AssistSuggestion => ({
-        id: typeof item.id === "string" ? item.id : `s-${index}`,
-        kind:
-          item.kind === "exclusion" || item.kind === "screen"
-            ? item.kind
-            : "acceptance",
-        title: typeof item.title === "string" ? item.title : "Suggestion",
-        detail: typeof item.detail === "string" ? item.detail : "",
-      }))
-      .filter((item) => item.detail),
-  };
-}
-
-/**
- * Prefer the edge function (optional LLM polish). Always falls back to
- * local heuristic assist so the UI works without OPENAI_API_KEY.
- */
+/** Grounded suggestions from the buyer's own draft. No remote model is called. */
 export async function requestAssist(
   input: AssistInput,
-  opts?: { accessToken?: string | null; supabaseUrl?: string; anonKey?: string }
+  opts?: { accessToken?: string | null }
 ): Promise<AssistResult> {
-  const local = heuristicAssist(input);
-  const base = opts?.supabaseUrl ?? import.meta.env.VITE_SUPABASE_URL;
-  const anon = opts?.anonKey ?? import.meta.env.VITE_SUPABASE_ANON_KEY;
-  const token = opts?.accessToken;
-
-  if (!base || !anon || !token) return local;
-
-  try {
-    const response = await fetch(`${base}/functions/v1/requirement-assist`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-        apikey: anon,
-      },
-      body: JSON.stringify(input),
-    });
-    if (!response.ok) return local;
-    const parsed = parseAssistPayload(await response.json());
-    return parsed?.suggestions.length ? parsed : local;
-  } catch {
-    return local;
-  }
+  void opts;
+  return heuristicAssist(input);
 }

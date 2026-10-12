@@ -1,6 +1,6 @@
 import { logAudit } from "./audit";
+import { backend } from "./backend";
 import { checkGuardrails } from "./guardrails";
-import { getSupabase } from "./supabase";
 import type {
   AppNotification,
   Bid,
@@ -24,13 +24,7 @@ import type {
   Thread,
 } from "../types";
 
-function db() {
-  const client = getSupabase();
-  if (!client) throw new Error("Supabase is not configured");
-  return client;
-}
-
-/** PostgREST returns embedded rows as an object or an array depending on cardinality. */
+/** PostgREST-shaped rows still arrive nested; the Worker keeps that shape. */
 function one<T>(value: T | T[] | null | undefined): T | null {
   if (!value) return null;
   return Array.isArray(value) ? (value[0] ?? null) : value;
@@ -124,36 +118,6 @@ function projectStage(value: string): ProjectStage {
   return "drafting";
 }
 
-function makeLockReference() {
-  return `LOCK-${Math.random().toString(16).slice(2, 8).toUpperCase()}`;
-}
-
-const PROJECT_SELECT = `
-  id, title, category, outcome_statement, stage, budget_min_cents, budget_max_cents,
-  monthly_run_cents, timeline_weeks, published_at, created_at, buyer_id,
-  buyer_profiles ( organization_name, scale ),
-  scope_items ( id, label, detail, included, acceptance_criteria, position ),
-  bids (
-    id, developer_id, status, amount_cents, monthly_run_cents, delivery_weeks,
-    message, created_at,
-    developer_profiles ( tier, profiles ( full_name, country_code ) )
-  ),
-  contracts (
-    id, lock_reference, status, locked_at, warranty_days, developer_id,
-    agreed_amount_cents, current_version, buyer_signed_at, developer_signed_at,
-    milestones (
-      id, title, description, amount_cents, status, position, due_on,
-      deliverables ( summary, preview_url, repository_url, submitted_at, buyer_feedback )
-    ),
-    change_orders ( id, title, description, status, amount_cents, added_weeks, raised_by, created_at ),
-    contract_versions ( version, reason, created_at ),
-    disputes ( id, reason, status, raised_by, created_at, resolution_note, scope_item_ids ),
-    reviews (
-      id, rating, matched_expectation, comment, author_id, created_at,
-      score_scope, score_quality, score_communication, score_timeliness
-    )
-  )
-`;
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function mapProject(row: any, currentUserId: string | null): Project {
@@ -334,49 +298,17 @@ function mapProject(row: any, currentUserId: string | null): Project {
   };
 }
 
-async function contractIdFor(projectId: string) {
-  const { data, error } = await db()
-    .from("contracts")
-    .select("id, current_version")
-    .eq("project_id", projectId)
-    .maybeSingle();
-  if (error) throw error;
-  return data;
-}
+
+const SCALE_TO_DB: Record<string, string> = {
+  "Local business": "local_business",
+  SMB: "smb",
+  Startup: "startup",
+  Enterprise: "enterprise",
+};
 
 export async function fetchProjects(currentUserId: string | null) {
-  const client = db();
-  const [{ data, error }, locksRes, statsRes] = await Promise.all([
-    client
-      .from("projects")
-      .select(PROJECT_SELECT)
-      .order("created_at", { ascending: false }),
-    client.from("project_locks").select(
-      "project_id, lock_reference, locked_at, warranty_days, developer_signed_at"
-    ),
-    client.from("project_bid_stats").select(
-      "project_id, bid_count, lowest_bid_cents"
-    ),
-  ]);
-  if (error) throw error;
-
-  const locksByProject = new Map(
-    (locksRes.data ?? []).map((row: any) => [row.project_id as string, row])
-  );
-  const statsByProject = new Map(
-    (statsRes.data ?? []).map((row: any) => [row.project_id as string, row])
-  );
-
-  return (data ?? []).map((row: any) =>
-    mapProject(
-      {
-        ...row,
-        _lock: locksByProject.get(row.id),
-        _bidStats: statsByProject.get(row.id),
-      },
-      currentUserId
-    )
-  );
+  const { projects } = await backend<{ projects: unknown[] }>("/v1/projects");
+  return (projects ?? []).map((row) => mapProject(row, currentUserId));
 }
 
 const nullableNumber = (value: unknown): number | null =>
@@ -407,27 +339,18 @@ function mapListing(row: any): DeveloperListing {
   };
 }
 
-/** Every developer a buyer is allowed to hire: verified and able to bid. */
 export async function fetchDeveloperDirectory(): Promise<DeveloperListing[]> {
-  const { data, error } = await db()
-    .from("developer_directory")
-    .select("*")
-    .eq("identity_status", "approved")
-    .not("bidding_unlocked_at", "is", null);
-  if (error) throw error;
-  return (data ?? []).map(mapListing);
+  const { developers } = await backend<{ developers: any[] }>("/v1/developers");
+  return (developers ?? []).map(mapListing);
 }
 
 export async function fetchDeveloperListing(
   profileId: string
 ): Promise<DeveloperListing | null> {
-  const { data, error } = await db()
-    .from("developer_directory")
-    .select("*")
-    .eq("profile_id", profileId)
-    .maybeSingle();
-  if (error) throw error;
-  return data ? mapListing(data) : null;
+  const { developer } = await backend<{ developer: any | null }>(
+    `/v1/developers/${profileId}`
+  );
+  return developer ? mapListing(developer) : null;
 }
 
 export type DeveloperReview = Review & {
@@ -435,18 +358,13 @@ export type DeveloperReview = Review & {
   buyerOrg: string;
 };
 
-/** Public review history for one developer, newest first. */
 export async function fetchDeveloperReviews(
   profileId: string
 ): Promise<DeveloperReview[]> {
-  const { data, error } = await db()
-    .from("developer_reviews")
-    .select("*")
-    .eq("subject_id", profileId)
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-
-  return (data ?? []).map((row: any) => ({
+  const { reviews } = await backend<{ reviews: any[] }>(
+    `/v1/developers/${profileId}/reviews`
+  );
+  return (reviews ?? []).map((row) => ({
     id: row.id,
     rating: Number(row.rating),
     scores: {
@@ -455,7 +373,7 @@ export async function fetchDeveloperReviews(
       communication: row.score_communication,
       timeliness: row.score_timeliness,
     },
-    matchedExpectation: row.matched_expectation,
+    matchedExpectation: Boolean(row.matched_expectation),
     comment: row.comment ?? "",
     author: row.buyer_org ?? "Buyer",
     createdAt: formatDate(row.created_at),
@@ -467,25 +385,18 @@ export async function fetchDeveloperReviews(
 export async function fetchDeveloperAccount(
   profileId: string
 ): Promise<DeveloperAccount> {
-  const { data, error } = await db()
-    .from("developer_profiles")
-    .select(
-      "tier, identity_status, interview_status, bidding_unlocked_at, interview_assessments ( score_security, score_efficiency, score_maintainability, score_recovery )"
-    )
-    .eq("profile_id", profileId)
-    .maybeSingle();
-  if (error) throw error;
-
-  const assessment = one<any>(data?.interview_assessments);
-
+  const { account, assessment } = await backend<{
+    account: any;
+    assessment: any;
+  }>(`/v1/developer/account?profile=${profileId}`);
   return {
-    identityStatus: (data?.identity_status ?? "not_started") as DeveloperAccount["identityStatus"],
-    interviewStatus: (data?.interview_status ?? "not_started") as DeveloperAccount["interviewStatus"],
-    membershipPaid: Boolean(data?.bidding_unlocked_at),
-    membershipPaidAt: data?.bidding_unlocked_at
-      ? formatDate(data.bidding_unlocked_at)
+    identityStatus: (account?.identity_status ?? "not_started") as DeveloperAccount["identityStatus"],
+    interviewStatus: (account?.interview_status ?? "not_started") as DeveloperAccount["interviewStatus"],
+    membershipPaid: Boolean(account?.bidding_unlocked_at),
+    membershipPaidAt: account?.bidding_unlocked_at
+      ? formatDate(account.bidding_unlocked_at)
       : undefined,
-    tier: TIER_FROM_DB[data?.tier ?? "applicant"] ?? "Applicant",
+    tier: TIER_FROM_DB[account?.tier ?? "applicant"] ?? "Applicant",
     interviewScores: [
       { label: "Security practices", score: assessment?.score_security ?? 0 },
       { label: "Efficiency under time pressure", score: assessment?.score_efficiency ?? 0 },
@@ -496,76 +407,49 @@ export async function fetchDeveloperAccount(
 }
 
 export async function fetchThreads(userId: string): Promise<Thread[]> {
-  const { data, error } = await db()
-    .from("message_threads")
-    .select(
-      `id, subject, project_id, buyer_id, developer_id,
-       buyer:profiles!message_threads_buyer_id_fkey ( full_name ),
-       developer:profiles!message_threads_developer_id_fkey ( full_name ),
-       messages ( id, body, sender_id, created_at )`
-    )
-    .order("last_message_at", { ascending: false });
-  if (error) throw error;
-
-  return (data ?? []).map((thread: any) => {
+  const { threads } = await backend<{ threads: any[] }>("/v1/threads");
+  return (threads ?? []).map((thread) => {
     const buyerName = one<any>(thread.buyer)?.full_name ?? "Buyer";
     const developerName = one<any>(thread.developer)?.full_name ?? "Developer";
     const viewerIsBuyer = thread.buyer_id === userId;
-
     return {
       id: thread.id,
       projectId: thread.project_id ?? "",
       subject: thread.subject,
       counterpart: viewerIsBuyer ? developerName : buyerName,
-      messages: many<any>(thread.messages)
-        .sort(
-          (a, b) =>
-            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-        )
-        .map((message) => ({
-          id: message.id,
-          from:
-            message.sender_id === thread.buyer_id
-              ? ("buyer" as const)
-              : ("developer" as const),
-          authorName:
-            message.sender_id === userId
-              ? "You"
-              : message.sender_id === thread.buyer_id
-                ? buyerName
-                : developerName,
-          body: message.body,
-          sentAt: formatDateTime(message.created_at),
-        })),
+      messages: many<any>(thread.messages).map((message) => ({
+        id: message.id,
+        from:
+          message.sender_id === thread.buyer_id
+            ? ("buyer" as const)
+            : ("developer" as const),
+        authorName:
+          message.sender_id === userId
+            ? "You"
+            : message.sender_id === thread.buyer_id
+              ? buyerName
+              : developerName,
+        body: message.body,
+        sentAt: formatDateTime(message.created_at),
+      })),
     };
   });
 }
 
-/**
- * Returns the conversation between a project's buyer and one developer,
- * opening it if this is the first time either side has written.
- */
 export async function openThread(projectId: string, developerId: string) {
-  const { data, error } = await db().rpc("ensure_thread", {
-    target_project: projectId,
-    target_developer: developerId,
+  const { id } = await backend<{ id: string }>("/v1/threads", {
+    body: { project_id: projectId, developer_id: developerId },
   });
-  if (error) throw error;
-  return data as string;
+  return id;
 }
 
 export async function fetchNotifications(
-  userId: string
+  _userId: string
 ): Promise<AppNotification[]> {
-  const { data, error } = await db()
-    .from("notifications")
-    .select("id, kind, title, body, link_path, read_at, created_at")
-    .eq("profile_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(50);
-  if (error) throw error;
-
-  return (data ?? []).map((row: any) => ({
+  const { notifications } = await backend<{ notifications: any[] }>(
+    "/v1/notifications"
+  );
+  return (notifications ?? []).map((row) => ({
     id: row.id,
     kind: row.kind as NotificationKind,
     title: row.title,
@@ -576,15 +460,8 @@ export async function fetchNotifications(
   }));
 }
 
-const SCALE_TO_DB: Record<string, string> = {
-  "Local business": "local_business",
-  SMB: "smb",
-  Startup: "startup",
-  Enterprise: "enterprise",
-};
-
 export async function createProject(
-  buyerId: string,
+  _buyerId: string,
   input: {
     title: string;
     category: string;
@@ -606,103 +483,56 @@ export async function createProject(
     });
     throw new Error(guard.message);
   }
-
-  if (input.scale && SCALE_TO_DB[input.scale]) {
-    const { error: scaleError } = await db()
-      .from("buyer_profiles")
-      .update({ scale: SCALE_TO_DB[input.scale] })
-      .eq("profile_id", buyerId);
-    if (scaleError) throw scaleError;
-  }
-
-  const { data, error } = await db().rpc("publish_requirement", {
-    p_title: input.title,
-    p_category: input.category,
-    p_outcome: input.outcome,
-    p_budget_min_cents: toCents(input.budgetMin),
-    p_budget_max_cents: toCents(input.budgetMax),
-    p_monthly_run_cents: toCents(input.monthlyOps),
-    p_timeline_weeks: input.timelineWeeks,
-    p_scope: input.scope.map((item) => ({
-      label: item.label,
-      detail: item.detail,
-      included: item.included,
-      acceptance_criteria: item.acceptanceCriteria ?? "",
-    })),
+  const { id } = await backend<{ id: string }>("/v1/projects", {
+    body: {
+      title: input.title,
+      category: input.category,
+      outcome: input.outcome,
+      budget_min_cents: toCents(input.budgetMin),
+      budget_max_cents: toCents(input.budgetMax),
+      monthly_run_cents: toCents(input.monthlyOps),
+      timeline_weeks: input.timelineWeeks,
+      scale: input.scale ? SCALE_TO_DB[input.scale] : undefined,
+      scope: input.scope.map((item) => ({
+        label: item.label,
+        detail: item.detail,
+        included: item.included,
+        acceptance_criteria: item.acceptanceCriteria ?? "",
+      })),
+    },
   });
-  if (error) throw error;
-
-  const id = data as string;
   logAudit("project.publish", "project", id, {
     title: input.title,
     category: input.category,
   });
-
   return id;
 }
 
 export async function lockProject(
   projectId: string,
-  buyerId: string,
+  _buyerId: string,
   monthlyOps: number,
   weeks: number
 ) {
-  const existing = await contractIdFor(projectId);
-
-  let contractId = existing?.id as string | undefined;
-  if (!contractId) {
-    const { data, error } = await db()
-      .from("contracts")
-      .insert({
-        project_id: projectId,
-        buyer_id: buyerId,
-        lock_reference: makeLockReference(),
-        status: "draft",
-        agreed_monthly_cents: toCents(monthlyOps),
-        agreed_weeks: weeks,
-      })
-      .select("id")
-      .single();
-    if (error) throw error;
-    contractId = data.id;
-  }
-
-  // The status change fires snapshot_contract_scope(), freezing the scope.
-  const { error: lockError } = await db()
-    .from("contracts")
-    .update({
-      status: "locked",
-      locked_at: new Date().toISOString(),
-      buyer_signed_at: new Date().toISOString(),
-    })
-    .eq("id", contractId);
-  if (lockError) throw lockError;
-
-  const { error: stageError } = await db()
-    .from("projects")
-    .update({ stage: "locked", published_at: new Date().toISOString() })
-    .eq("id", projectId);
-  if (stageError) throw stageError;
-
+  await backend(`/v1/projects/${projectId}/lock`, {
+    body: { monthly_ops_cents: toCents(monthlyOps), weeks },
+  });
   logAudit("project.lock", "project", projectId);
 }
 
 export async function placeBid(
   projectId: string,
-  developerId: string,
+  _developerId: string,
   input: { amount: number; monthlyOps: number; weeks: number; note: string }
 ) {
-  const { error } = await db().from("bids").insert({
-    project_id: projectId,
-    developer_id: developerId,
-    amount_cents: toCents(input.amount),
-    monthly_run_cents: toCents(input.monthlyOps),
-    delivery_weeks: input.weeks,
-    message: input.note,
-    accepts_locked_scope: true,
+  await backend(`/v1/projects/${projectId}/bids`, {
+    body: {
+      amount_cents: toCents(input.amount),
+      monthly_run_cents: toCents(input.monthlyOps),
+      delivery_weeks: input.weeks,
+      message: input.note,
+    },
   });
-  if (error) throw error;
-
   logAudit("bid.place", "project", projectId, {
     amount: input.amount,
     weeks: input.weeks,
@@ -710,88 +540,12 @@ export async function placeBid(
 }
 
 export async function setBidStatus(bidId: string, status: BidStatus) {
-  const { error } = await db().from("bids").update({ status }).eq("id", bidId);
-  if (error) throw error;
+  await backend(`/v1/bids/${bidId}/status`, { body: { status } });
 }
 
-export async function awardBid(
-  projectId: string,
-  bidId: string,
-  amount: number
-) {
-  const { data: feeOk, error: feeError } = await db().rpc("hire_success_fee_paid", {
-    p_bid_id: bidId,
-  });
-  if (feeError) throw feeError;
-  if (!feeOk) {
-    throw new Error(
-      "Pay Okavo’s 10% hire success fee before awarding. This keeps deals on-platform."
-    );
-  }
-
-  const contract = await contractIdFor(projectId);
-  if (!contract) throw new Error("Lock the requirement before awarding");
-
-  const { data: bid, error: bidError } = await db()
-    .from("bids")
-    .select("developer_id, delivery_weeks")
-    .eq("id", bidId)
-    .single();
-  if (bidError) throw bidError;
-
-  await db().from("bids").update({ status: "declined" }).eq("project_id", projectId);
-  await db().from("bids").update({ status: "awarded" }).eq("id", bidId);
-
-  // Hire awards the bid and creates milestones, but delivery starts only after
-  // the developer countersigns the frozen lock (countersign_contract RPC).
-  const { error: contractError } = await db()
-    .from("contracts")
-    .update({
-      developer_id: bid.developer_id,
-      agreed_amount_cents: toCents(amount),
-      agreed_weeks: bid.delivery_weeks,
-      developer_signed_at: null,
-    })
-    .eq("id", contract.id);
-  if (contractError) throw contractError;
-
-  await db().from("projects").update({ stage: "hired" }).eq("id", projectId);
-
-  const first = Math.round(amount * 0.2);
-  const second = Math.round(amount * 0.4);
-  const { error: milestoneError } = await db()
-    .from("milestones")
-    .insert([
-      {
-        contract_id: contract.id,
-        title: "Foundation (small first slice)",
-        description:
-          "First locked flows only — keep this milestone small so the buyer never prepays the whole build.",
-        amount_cents: toCents(first),
-        position: 0,
-      },
-      {
-        contract_id: contract.id,
-        title: "Main functionality",
-        description: "The bulk of the locked scope, demoed against acceptance lines.",
-        amount_cents: toCents(second),
-        position: 1,
-      },
-      {
-        contract_id: contract.id,
-        title: "Acceptance and handover",
-        description: "Remaining scope verified, documentation and deployment.",
-        amount_cents: toCents(amount - first - second),
-        position: 2,
-      },
-    ]);
-  if (milestoneError) throw milestoneError;
-
-  logAudit("bid.award", "project", projectId, {
-    bidId,
-    amount,
-    developerId: bid.developer_id,
-  });
+export async function awardBid(projectId: string, bidId: string, _amount: number) {
+  await backend(`/v1/bids/${bidId}/award`, { body: { project_id: projectId } });
+  logAudit("bid.award", "project", projectId, { bidId });
 }
 
 export async function payMembership(_profileId: string, _amountCents: number) {
@@ -800,32 +554,22 @@ export async function payMembership(_profileId: string, _amountCents: number) {
   );
 }
 
-/**
- * Buys the right to post one requirement. The insert trigger on `projects`
- * consumes it, so a fee cannot be reused across requirements.
- */
 export async function payPostingFee(_profileId: string, _amountCents: number) {
   throw new Error(
     "Demo posting payment is disabled. Use Razorpay checkout when publishing."
   );
 }
 
-export async function countPostingFees(profileId: string) {
-  const { count, error } = await db()
-    .from("payments")
-    .select("id", { count: "exact", head: true })
-    .eq("profile_id", profileId)
-    .eq("purpose", "requirement_posting")
-    .eq("status", "paid");
-  if (error) throw error;
+export async function countPostingFees(_profileId: string) {
+  const { count } = await backend<{ count: number }>("/v1/posting-fees");
   return count ?? 0;
 }
 
-/** True when a paid posting fee is sitting unused (retry after paid publish). */
 export async function hasUnconsumedPostingFee() {
-  const { data, error } = await db().rpc("has_unconsumed_posting_fee");
-  if (error) throw error;
-  return Boolean(data);
+  const { unconsumed } = await backend<{ unconsumed: boolean }>(
+    "/v1/posting-fees/unconsumed"
+  );
+  return Boolean(unconsumed);
 }
 
 export type IdentitySubmission = {
@@ -835,63 +579,15 @@ export type IdentitySubmission = {
   selfie: File | null;
 };
 
-/**
- * Uploads identity documents to a private bucket and opens a review record.
- * Objects are filed under the developer's own id, which is what the storage
- * policy authorises against.
- */
 export async function submitIdentity(
-  profileId: string,
-  input: IdentitySubmission
+  _profileId: string,
+  _input: IdentitySubmission
 ) {
-  const client = db();
-  const stamp = Date.now();
-  const extension = input.document.name.split(".").pop() ?? "bin";
-  const documentPath = `${profileId}/${stamp}-document.${extension}`;
-
-  const { error: uploadError } = await client.storage
-    .from("identity-documents")
-    .upload(documentPath, input.document, { upsert: false });
-  if (uploadError) throw uploadError;
-
-  let selfiePath: string | null = null;
-  if (input.selfie) {
-    const selfieExtension = input.selfie.name.split(".").pop() ?? "bin";
-    selfiePath = `${profileId}/${stamp}-selfie.${selfieExtension}`;
-    const { error: selfieError } = await client.storage
-      .from("identity-documents")
-      .upload(selfiePath, input.selfie, { upsert: false });
-    if (selfieError) throw selfieError;
-  }
-
-  const { error } = await client.from("identity_verifications").insert({
-    developer_id: profileId,
-    status: "submitted",
-    document_type: input.documentType,
-    document_country: input.documentCountry,
-    document_storage_path: documentPath,
-    selfie_storage_path: selfiePath,
-  });
-  if (error) throw error;
-
-  const { error: statusError } = await client
-    .from("developer_profiles")
-    .update({ identity_status: "submitted" })
-    .eq("profile_id", profileId);
-  if (statusError) throw statusError;
-
-  logAudit("identity.submit", "developer", profileId, {
-    documentType: input.documentType,
-    documentCountry: input.documentCountry,
-  });
+  await backend("/v1/identity", { body: { unavailable: true } });
 }
 
-export async function submitInterview(profileId: string) {
-  const { error } = await db()
-    .from("developer_profiles")
-    .update({ interview_status: "submitted" })
-    .eq("profile_id", profileId);
-  if (error) throw error;
+export async function submitInterview(_profileId: string) {
+  await backend("/v1/developer/interview", { body: {} });
 }
 
 export type ExternalPaymentProof = {
@@ -905,14 +601,10 @@ export async function fetchExternalPaymentProofs(
   milestoneIds: string[]
 ): Promise<ExternalPaymentProof[]> {
   if (milestoneIds.length === 0) return [];
-  const { data, error } = await db()
-    .from("payments")
-    .select("milestone_id, payer_reference, proof_storage_path, paid_at")
-    .in("milestone_id", milestoneIds)
-    .eq("provider", "external")
-    .eq("status", "paid");
-  if (error) throw error;
-  return (data ?? []).map((row) => ({
+  const { proofs } = await backend<{ proofs: any[] }>(
+    `/v1/milestone-proofs?ids=${encodeURIComponent(milestoneIds.join(","))}`
+  );
+  return (proofs ?? []).map((row) => ({
     milestoneId: row.milestone_id as string,
     reference: (row.payer_reference as string | null) ?? null,
     proofPath: (row.proof_storage_path as string | null) ?? null,
@@ -920,93 +612,54 @@ export async function fetchExternalPaymentProofs(
   }));
 }
 
-export async function signedPaymentProofUrl(path: string) {
-  const { data, error } = await db()
-    .storage.from("payment-proofs")
-    .createSignedUrl(path, 300);
-  if (error) throw error;
-  return data.signedUrl;
+export async function signedPaymentProofUrl(_path: string): Promise<string> {
+  throw new Error(
+    "Payment proof files are not stored on this backend. The reference is still on the payment."
+  );
 }
 
 export async function fundMilestone(
   milestoneId: string,
   reference?: string,
   proof?: File | null,
-  profileId?: string
+  _profileId?: string
 ) {
-  let proofPath: string | null = null;
   if (proof) {
-    if (!profileId) throw new Error("Could not identify the proof owner");
-    const safeName = proof.name.replace(/[^a-zA-Z0-9._-]/g, "-").slice(-100);
-    proofPath = `${profileId}/${milestoneId}/${crypto.randomUUID()}-${safeName}`;
-    const { error: uploadError } = await db()
-      .storage.from("payment-proofs")
-      .upload(proofPath, proof, { upsert: false });
-    if (uploadError) throw uploadError;
+    throw new Error(
+      "Payment proof files are not stored on this backend. Record the payment reference without a file."
+    );
   }
-
-  // Buyer attests they paid the developer outside Okavo. Creates a paid
-  // external payment record after work acceptance. Okavo never holds it.
-  const { error } = await db().rpc("attest_external_milestone_payment", {
-    p_milestone_id: milestoneId,
-    p_payer_reference: reference?.trim() || null,
-    p_proof_storage_path: proofPath,
+  await backend(`/v1/milestones/${milestoneId}/fund`, {
+    body: { reference: reference?.trim() || null },
   });
-  if (error) {
-    if (proofPath) {
-      await db().storage.from("payment-proofs").remove([proofPath]);
-    }
-    throw error;
-  }
-
   logAudit("milestone.fund", "milestone", milestoneId);
 }
 
 export async function submitMilestone(
   milestoneId: string,
-  developerId: string,
+  _developerId: string,
   summary: string,
   previewUrl: string
 ) {
-  const { error } = await db().from("deliverables").insert({
-    milestone_id: milestoneId,
-    developer_id: developerId,
-    summary,
-    preview_url: previewUrl || null,
+  await backend(`/v1/milestones/${milestoneId}/submit`, {
+    body: { summary, preview_url: previewUrl },
   });
-  if (error) throw error;
-
-  const { error: statusError } = await db()
-    .from("milestones")
-    .update({ status: "submitted", submitted_at: new Date().toISOString() })
-    .eq("id", milestoneId);
-  if (statusError) throw statusError;
 }
 
 export async function acceptMilestone(milestoneId: string) {
-  const { error } = await db().rpc("accept_milestone", {
-    p_milestone_id: milestoneId,
-  });
-  if (error) throw error;
-
+  await backend(`/v1/milestones/${milestoneId}/accept`, { body: {} });
   logAudit("milestone.accept", "milestone", milestoneId);
 }
 
 export async function createChangeOrder(
   projectId: string,
-  raisedBy: string,
+  _raisedBy: string,
   title: string,
   description: string
 ) {
-  const contract = await contractIdFor(projectId);
-  if (!contract) throw new Error("No contract for this project");
-  const { error } = await db().from("change_orders").insert({
-    contract_id: contract.id,
-    raised_by: raisedBy,
-    title,
-    description,
+  await backend(`/v1/projects/${projectId}/change-orders`, {
+    body: { title, description },
   });
-  if (error) throw error;
 }
 
 export async function priceChangeOrder(
@@ -1014,123 +667,40 @@ export async function priceChangeOrder(
   amount: number,
   addedWeeks: number
 ) {
-  const { error } = await db()
-    .from("change_orders")
-    .update({
-      status: "priced",
-      amount_cents: toCents(amount),
-      added_weeks: addedWeeks,
-    })
-    .eq("id", changeOrderId);
-  if (error) throw error;
+  await backend(`/v1/change-orders/${changeOrderId}/price`, {
+    body: { amount_cents: toCents(amount), added_weeks: addedWeeks },
+  });
 }
 
 export async function decideChangeOrder(
-  projectId: string,
+  _projectId: string,
   changeOrderId: string,
   accepted: boolean
 ) {
-  const { data: order, error: readError } = await db()
-    .from("change_orders")
-    .select("title, added_weeks, amount_cents, contract_id")
-    .eq("id", changeOrderId)
-    .single();
-  if (readError) throw readError;
-
-  const { error } = await db()
-    .from("change_orders")
-    .update({
-      status: accepted ? "accepted" : "declined",
-      decided_at: new Date().toISOString(),
-    })
-    .eq("id", changeOrderId);
-  if (error) throw error;
-
-  if (!accepted) return;
-
-  const { count } = await db()
-    .from("scope_items")
-    .select("id", { count: "exact", head: true })
-    .eq("project_id", projectId);
-
-  await db().from("scope_items").insert({
-    project_id: projectId,
-    label: order.title,
-    detail: "Added by an accepted change order.",
-    included: true,
-    position: count ?? 0,
-  });
-
-  const { data: project } = await db()
-    .from("projects")
-    .select("timeline_weeks")
-    .eq("id", projectId)
-    .single();
-
-  await db()
-    .from("projects")
-    .update({
-      timeline_weeks: (project?.timeline_weeks ?? 0) + (order.added_weeks ?? 0),
-    })
-    .eq("id", projectId);
-
-  const { data: contract } = await db()
-    .from("contracts")
-    .select("current_version")
-    .eq("id", order.contract_id)
-    .single();
-
-  const nextVersion = (contract?.current_version ?? 1) + 1;
-  await db()
-    .from("contracts")
-    .update({ current_version: nextVersion })
-    .eq("id", order.contract_id);
-
-  const { data: scopeSnapshot, error: snapError } = await db().rpc(
-    "snapshot_scope_for_contract",
-    { p_contract_id: order.contract_id }
-  );
-  if (snapError) throw snapError;
-
-  await db().from("contract_versions").insert({
-    contract_id: order.contract_id,
-    version: nextVersion,
-    snapshot: {
-      scope: scopeSnapshot ?? [],
-      change_order: {
-        title: order.title,
-        amount_cents: order.amount_cents ?? null,
-        added_weeks: order.added_weeks ?? null,
-      },
-    },
-    reason: `Change order accepted: ${order.title}`,
+  await backend(`/v1/change-orders/${changeOrderId}/decide`, {
+    body: { accepted },
   });
 }
 
 export async function countersignContract(projectId: string) {
-  const { error } = await db().rpc("countersign_contract", {
-    p_project_id: projectId,
-  });
-  if (error) throw error;
-
+  await backend(`/v1/projects/${projectId}/countersign`, { body: {} });
   logAudit("contract.countersign", "project", projectId);
 }
 
 export async function inviteBuilderToProject(projectId: string, email: string) {
-  const { data, error } = await db().rpc("invite_builder_to_project", {
-    p_project_id: projectId,
-    p_email: email,
-  });
-  if (error) throw error;
-  return data as string;
+  const { token } = await backend<{ token: string }>(
+    `/v1/projects/${projectId}/invites`,
+    { body: { email } }
+  );
+  return token;
 }
 
 export async function acceptProjectInvite(token: string) {
-  const { data, error } = await db().rpc("accept_project_invite", {
-    p_token: token,
-  });
-  if (error) throw error;
-  return data as string;
+  const { project_id: projectId } = await backend<{ project_id: string }>(
+    "/v1/invites/accept",
+    { body: { token } }
+  );
+  return projectId;
 }
 
 export type ClarificationRequest = {
@@ -1147,15 +717,10 @@ export type ClarificationRequest = {
 export async function fetchClarifications(
   projectId: string
 ): Promise<ClarificationRequest[]> {
-  const { data, error } = await db()
-    .from("clarification_requests")
-    .select(
-      "id, project_id, developer_id, scope_item_id, question, answer, created_at, answered_at"
-    )
-    .eq("project_id", projectId)
-    .order("created_at", { ascending: true });
-  if (error) throw error;
-  return (data ?? []).map((row) => ({
+  const { clarifications } = await backend<{ clarifications: any[] }>(
+    `/v1/projects/${projectId}/clarifications`
+  );
+  return (clarifications ?? []).map((row) => ({
     id: row.id,
     projectId: row.project_id,
     developerId: row.developer_id,
@@ -1169,7 +734,7 @@ export async function fetchClarifications(
 
 export async function askClarification(
   projectId: string,
-  developerId: string,
+  _developerId: string,
   question: string,
   scopeItemId?: string | null
 ) {
@@ -1182,15 +747,9 @@ export async function askClarification(
     });
     throw new Error(guard.message);
   }
-
-  const { error } = await db().from("clarification_requests").insert({
-    project_id: projectId,
-    developer_id: developerId,
-    question: question.trim(),
-    scope_item_id: scopeItemId || null,
+  await backend(`/v1/projects/${projectId}/clarifications`, {
+    body: { question: question.trim(), scope_item_id: scopeItemId || null },
   });
-  if (error) throw error;
-
   logAudit("clarification.ask", "project", projectId);
 }
 
@@ -1204,17 +763,12 @@ export async function answerClarification(requestId: string, answer: string) {
     });
     throw new Error(guard.message);
   }
-
-  const { error } = await db().rpc("answer_clarification", {
-    p_request_id: requestId,
-    p_answer: answer,
+  await backend(`/v1/clarifications/${requestId}/answer`, {
+    body: { answer },
   });
-  if (error) throw error;
-
   logAudit("clarification.answer", "clarification", requestId);
 }
 
-/** Structured build package for IDE / AI tool ingestion. */
 export function buildBiblePayload(project: Project) {
   return {
     format: "okavo.build_bible.v1",
@@ -1241,13 +795,13 @@ export function buildBiblePayload(project: Project) {
       included: item.included,
       acceptanceCriteria: item.acceptanceCriteria ?? null,
     })),
-    milestones: project.milestones.map((m, index) => ({
+    milestones: project.milestones.map((milestone, index) => ({
       position: index,
-      id: m.id,
-      title: m.title,
-      description: m.description,
-      amountUsd: m.amount,
-      status: m.status,
+      id: milestone.id,
+      title: milestone.title,
+      description: milestone.description,
+      amountUsd: milestone.amount,
+      status: milestone.status,
     })),
   };
 }
@@ -1267,92 +821,34 @@ export function downloadBuildBible(project: Project) {
 
 export async function raiseDispute(
   projectId: string,
-  raisedBy: string,
+  _raisedBy: string,
   reason: string,
   scopeItemIds: string[] = []
 ) {
-  const contract = await contractIdFor(projectId);
-  if (!contract) throw new Error("No contract for this project");
-  const { error } = await db().from("disputes").insert({
-    contract_id: contract.id,
-    raised_by: raisedBy,
-    reason,
-    scope_item_ids: scopeItemIds.length > 0 ? scopeItemIds : null,
+  await backend(`/v1/projects/${projectId}/disputes`, {
+    body: { reason, scope_item_ids: scopeItemIds },
   });
-  if (error) throw error;
-
-  await db()
-    .from("contracts")
-    .update({ status: "disputed" })
-    .eq("id", contract.id);
 }
 
 export async function resolveDispute(disputeId: string, note: string) {
-  const { error } = await db().rpc("resolve_dispute_against_scope", {
-    p_dispute_id: disputeId,
-    p_note: note,
-  });
-  if (error) throw error;
+  await backend(`/v1/disputes/${disputeId}/resolve`, { body: { note } });
 }
 
 export async function leaveReview(
   projectId: string,
-  authorId: string,
+  _authorId: string,
   input: { scores: ReviewScores; comment: string }
 ) {
-  const contract = await contractIdFor(projectId);
-  if (!contract) throw new Error("No contract for this project");
-
-  const { data: contractRow } = await db()
-    .from("contracts")
-    .select("developer_id, buyer_id")
-    .eq("id", contract.id)
-    .single();
-
-  const subjectId =
-    contractRow?.developer_id === authorId
-      ? contractRow?.buyer_id
-      : contractRow?.developer_id;
-
-  // `rating` and `matched_expectation` are generated from these four.
-  const { error } = await db().from("reviews").insert({
-    contract_id: contract.id,
-    author_id: authorId,
-    subject_id: subjectId ?? authorId,
-    score_scope: input.scores.scope,
-    score_quality: input.scores.quality,
-    score_communication: input.scores.communication,
-    score_timeliness: input.scores.timeliness,
-    comment: input.comment,
-  });
-  if (error) throw error;
-
-  await db().from("projects").update({ stage: "closed" }).eq("id", projectId);
-  await db()
-    .from("contracts")
-    .update({ status: "completed", completed_at: new Date().toISOString() })
-    .eq("id", contract.id);
+  await backend(`/v1/projects/${projectId}/reviews`, { body: input });
 }
 
 export async function sendMessage(
   threadId: string,
-  senderId: string,
+  _senderId: string,
   body: string
 ) {
-  const { error } = await db().from("messages").insert({
-    thread_id: threadId,
-    sender_id: senderId,
-    body,
-  });
-  if (error) throw error;
-
-  await db()
-    .from("message_threads")
-    .update({ last_message_at: new Date().toISOString() })
-    .eq("id", threadId);
+  await backend(`/v1/threads/${threadId}/messages`, { body: { body } });
 }
-
-/* ---------------------------------------------------------------- admin -- */
 
 export type ReviewItem = {
   id: string;
@@ -1368,64 +864,36 @@ export type ReviewItem = {
 };
 
 export async function fetchVerificationQueue(): Promise<ReviewItem[]> {
-  const { data, error } = await db()
-    .from("identity_verifications")
-    .select(
-      "id, developer_id, status, document_type, document_country, document_storage_path, selfie_storage_path, created_at, developer_profiles ( profiles ( full_name, country_code ) )"
-    )
-    .order("created_at", { ascending: true });
-  if (error) throw error;
-
-  return (data ?? []).map((row: any) => {
-    const profile = one<any>(one<any>(row.developer_profiles)?.profiles);
-    return {
-      id: row.id,
-      developerId: row.developer_id,
-      developerName: profile?.full_name ?? "Developer",
-      country: profile?.country_code ?? "—",
-      documentType: row.document_type,
-      documentCountry: row.document_country,
-      documentPath: row.document_storage_path,
-      selfiePath: row.selfie_storage_path,
-      status: row.status,
-      submittedAt: formatDate(row.created_at),
-    };
-  });
+  const { items } = await backend<{ items: any[] }>("/v1/admin/verifications");
+  return (items ?? []).map((row) => ({
+    id: row.id,
+    developerId: row.developer_id,
+    developerName: row.full_name ?? "Developer",
+    country: row.country_code ?? "—",
+    documentType: row.document_type,
+    documentCountry: row.document_country,
+    documentPath: row.document_storage_path ?? "",
+    selfiePath: row.selfie_storage_path,
+    status: row.status,
+    submittedAt: formatDate(row.created_at),
+  }));
 }
 
-/** Signed URLs let an admin view a private document without making it public. */
-export async function signedDocumentUrl(path: string) {
-  const { data, error } = await db()
-    .storage.from("identity-documents")
-    .createSignedUrl(path, 300);
-  if (error) throw error;
-  return data.signedUrl;
+export async function signedDocumentUrl(_path: string): Promise<string> {
+  throw new Error(
+    "Identity document storage is not configured. Nothing can be opened."
+  );
 }
 
 export async function decideVerification(
   verificationId: string,
-  developerId: string,
+  _developerId: string,
   approved: boolean,
   reason?: string
 ) {
-  const { error } = await db()
-    .from("identity_verifications")
-    .update({
-      status: approved ? "approved" : "rejected",
-      rejection_reason: approved ? null : (reason ?? "Not legible"),
-      reviewed_at: new Date().toISOString(),
-    })
-    .eq("id", verificationId);
-  if (error) throw error;
-
-  const { error: profileError } = await db()
-    .from("developer_profiles")
-    .update({
-      identity_status: approved ? "approved" : "rejected",
-      tier: approved ? "verified" : "applicant",
-    })
-    .eq("profile_id", developerId);
-  if (profileError) throw profileError;
+  await backend(`/v1/admin/verifications/${verificationId}`, {
+    body: { approved, reason },
+  });
 }
 
 export type PlatformInsights = {
@@ -1441,68 +909,7 @@ export type PlatformInsights = {
 };
 
 export async function fetchInsights(): Promise<PlatformInsights> {
-  const client = db();
-
-  // Count a named column, never "*". Tables like buyer_profiles grant SELECT
-  // per column to hide billing details, and "*" asks for columns we revoked.
-  const countOf = async (
-    table: string,
-    column: string,
-    filter?: (query: any) => any
-  ): Promise<number> => {
-    let query = client.from(table).select(column, { count: "exact", head: true });
-    if (filter) query = filter(query);
-    const { count, error } = await query;
-    if (error) throw error;
-    return count ?? 0;
-  };
-
-  const [buyers, developers, verifiedDevelopers, projects, lockedProjects, bids, pendingReviews] =
-    await Promise.all([
-      countOf("buyer_profiles", "profile_id"),
-      countOf("developer_profiles", "profile_id"),
-      countOf("developer_profiles", "profile_id", (q) =>
-        q.eq("identity_status", "approved")
-      ),
-      countOf("projects", "id"),
-      countOf("projects", "id", (q) => q.neq("stage", "drafting")),
-      countOf("bids", "id"),
-      countOf("identity_verifications", "id", (q) => q.eq("status", "submitted")),
-    ]);
-
-  const { data: fees } = await client
-    .from("payments")
-    .select("amount_cents, purpose, status");
-
-  const feesCollectedCents = (fees ?? [])
-    .filter(
-      (row: any) =>
-        row.status === "paid" &&
-        ["bidding_membership", "requirement_posting", "platform_fee"].includes(
-          row.purpose
-        )
-    )
-    .reduce((sum: number, row: any) => sum + row.amount_cents, 0);
-
-  const { data: milestones } = await client
-    .from("milestones")
-    .select("amount_cents, status");
-
-  const escrowCents = (milestones ?? [])
-    .filter((row: any) => ["funded", "submitted"].includes(row.status))
-    .reduce((sum: number, row: any) => sum + row.amount_cents, 0);
-
-  return {
-    buyers,
-    developers,
-    verifiedDevelopers,
-    projects,
-    lockedProjects,
-    bids,
-    feesCollectedCents,
-    escrowCents,
-    pendingReviews,
-  };
+  return backend<PlatformInsights>("/v1/admin/insights");
 }
 
 export type AnalyticsOverview = {
@@ -1532,16 +939,16 @@ export type AnalyticsDimension =
 export async function fetchAnalyticsOverview(
   days: number
 ): Promise<AnalyticsOverview> {
-  const { data, error } = await db().rpc("analytics_overview", { days });
-  if (error) throw error;
-  const row = (Array.isArray(data) ? data[0] : data) ?? {};
+  const { overview } = await backend<{ overview: any }>(
+    `/v1/admin/analytics/overview?days=${days}`
+  );
   return {
-    pageViews: Number(row.page_views ?? 0),
-    uniqueVisitors: Number(row.unique_visitors ?? 0),
-    sessions: Number(row.sessions ?? 0),
-    newVisitors: Number(row.new_visitors ?? 0),
-    countries: Number(row.countries ?? 0),
-    signedInViews: Number(row.signed_in_views ?? 0),
+    pageViews: Number(overview?.page_views ?? 0),
+    uniqueVisitors: Number(overview?.unique_visitors ?? 0),
+    sessions: Number(overview?.sessions ?? 0),
+    newVisitors: Number(overview?.new_visitors ?? 0),
+    countries: Number(overview?.countries ?? 0),
+    signedInViews: Number(overview?.signed_in_views ?? 0),
   };
 }
 
@@ -1550,13 +957,10 @@ export async function fetchAnalyticsBreakdown(
   days: number,
   maxRows = 12
 ): Promise<BreakdownRow[]> {
-  const { data, error } = await db().rpc("analytics_breakdown", {
-    dimension,
-    days,
-    max_rows: maxRows,
-  });
-  if (error) throw error;
-  return (data ?? []).map((row: any) => ({
+  const { rows } = await backend<{ rows: any[] }>(
+    `/v1/admin/analytics/breakdown?dimension=${dimension}&days=${days}&max=${maxRows}`
+  );
+  return (rows ?? []).map((row) => ({
     label: row.label,
     views: Number(row.views),
     visitors: Number(row.visitors),
@@ -1566,9 +970,10 @@ export async function fetchAnalyticsBreakdown(
 export async function fetchAnalyticsDaily(
   days: number
 ): Promise<{ day: string; views: number; visitors: number }[]> {
-  const { data, error } = await db().rpc("analytics_daily", { days });
-  if (error) throw error;
-  return (data ?? []).map((row: any) => ({
+  const { rows } = await backend<{ rows: any[] }>(
+    `/v1/admin/analytics/daily?days=${days}`
+  );
+  return (rows ?? []).map((row) => ({
     day: row.day,
     views: Number(row.views),
     visitors: Number(row.visitors),
@@ -1594,18 +999,9 @@ export type AuditEventRow = {
 export async function fetchAuditBucketCounts(): Promise<
   Record<AuditAgeBucket, number>
 > {
-  const { data, error } = await db().rpc("admin_audit_bucket_counts");
-  if (error) throw error;
-  const counts: Record<AuditAgeBucket, number> = {
-    "7d": 0,
-    "14d": 0,
-    "30d": 0,
-    older: 0,
-  };
-  for (const row of data ?? []) {
-    const bucket = row.bucket as AuditAgeBucket;
-    if (bucket in counts) counts[bucket] = Number(row.event_count ?? 0);
-  }
+  const { counts } = await backend<{ counts: Record<AuditAgeBucket, number> }>(
+    "/v1/admin/audit/buckets"
+  );
   return counts;
 }
 
@@ -1614,13 +1010,10 @@ export async function fetchAuditEvents(
   limit = 200,
   offset = 0
 ): Promise<AuditEventRow[]> {
-  const { data, error } = await db().rpc("admin_list_audit_events", {
-    p_bucket: bucket,
-    p_limit: limit,
-    p_offset: offset,
-  });
-  if (error) throw error;
-  return (data ?? []).map((row: any) => ({
+  const { events } = await backend<{ events: any[] }>(
+    `/v1/admin/audit?bucket=${bucket}&limit=${limit}&offset=${offset}`
+  );
+  return (events ?? []).map((row) => ({
     id: row.id,
     actorId: row.actor_id ?? null,
     actorName: row.actor_name ?? null,
@@ -1639,45 +1032,28 @@ export async function fetchAuditEvents(
 }
 
 export async function markNotificationRead(notificationId: string) {
-  const { error } = await db()
-    .from("notifications")
-    .update({ read_at: new Date().toISOString() })
-    .eq("id", notificationId)
-    .is("read_at", null);
-  if (error) throw error;
+  await backend(`/v1/notifications/${notificationId}/read`, { body: {} });
 }
 
-export async function markNotificationsRead(userId: string) {
-  const { error } = await db()
-    .from("notifications")
-    .update({ read_at: new Date().toISOString() })
-    .eq("profile_id", userId)
-    .is("read_at", null);
-  if (error) throw error;
+export async function markNotificationsRead(_userId: string) {
+  await backend("/v1/notifications/read", { body: {} });
 }
 
 export async function hireSuccessFeePaid(bidId: string) {
-  const { data, error } = await db().rpc("hire_success_fee_paid", {
-    p_bid_id: bidId,
-  });
-  if (error) throw error;
-  return Boolean(data);
+  const { paid } = await backend<{ paid: boolean }>(`/v1/bids/${bidId}/hire-fee`);
+  return Boolean(paid);
 }
 
 export async function acceptPlatformTerms(version: string) {
-  const { error } = await db().rpc("accept_platform_terms", {
-    p_version: version,
-  });
-  if (error) throw error;
+  await backend("/v1/terms", { body: { version } });
   logAudit("terms.accept", "profile", null, { version });
 }
 
 export async function hasAcceptedTerms(version: string) {
-  const { data, error } = await db().rpc("has_accepted_current_terms", {
-    p_version: version,
-  });
-  if (error) throw error;
-  return Boolean(data);
+  const { accepted } = await backend<{ accepted: boolean }>(
+    `/v1/terms?version=${encodeURIComponent(version)}`
+  );
+  return Boolean(accepted);
 }
 
 export async function requestDeveloperBlock(
@@ -1686,28 +1062,25 @@ export async function requestDeveloperBlock(
   detail?: string,
   projectId?: string | null
 ) {
-  const { data, error } = await db().rpc("request_developer_block", {
-    p_developer_id: developerId,
-    p_reason: reason,
-    p_detail: detail ?? null,
-    p_project_id: projectId ?? null,
+  const { id } = await backend<{ id: string }>("/v1/blocks", {
+    body: {
+      developer_id: developerId,
+      reason,
+      detail: detail ?? null,
+      project_id: projectId ?? null,
+    },
   });
-  if (error) throw error;
   logAudit("block.request", "developer", developerId, { reason });
-  return data as string;
+  return id;
 }
 
-export async function listBlockRequests(status: "open" | "approved" | "rejected" = "open") {
-  const { data, error } = await db()
-    .from("developer_block_requests")
-    .select(
-      "id, buyer_id, developer_id, project_id, reason, detail, status, created_at"
-    )
-    .eq("status", status)
-    .order("created_at", { ascending: false })
-    .limit(100);
-  if (error) throw error;
-  return (data ?? []).map((row) => ({
+export async function listBlockRequests(
+  status: "open" | "approved" | "rejected" = "open"
+) {
+  const { requests } = await backend<{ requests: any[] }>(
+    `/v1/blocks?status=${status}`
+  );
+  return (requests ?? []).map((row) => ({
     id: row.id as string,
     buyerId: row.buyer_id as string,
     developerId: row.developer_id as string,
@@ -1724,12 +1097,9 @@ export async function reviewDeveloperBlock(
   approve: boolean,
   adminNote?: string
 ) {
-  const { error } = await db().rpc("review_developer_block", {
-    p_request_id: requestId,
-    p_approve: approve,
-    p_admin_note: adminNote ?? null,
+  await backend(`/v1/blocks/${requestId}/review`, {
+    body: { approve, admin_note: adminNote ?? null },
   });
-  if (error) throw error;
   logAudit(approve ? "block.approve" : "block.reject", "block", requestId);
 }
 
@@ -1755,9 +1125,7 @@ export type OperationsEvent = {
 };
 
 export async function fetchOperationsHealth(): Promise<OperationsHealth> {
-  const { data, error } = await db().rpc("admin_operations_health");
-  if (error) throw error;
-  const row = (data ?? {}) as Record<string, unknown>;
+  const row = await backend<Record<string, unknown>>("/v1/admin/operations");
   return {
     pendingPayments: Number(row.pending_payments ?? 0),
     failedEvents24h: Number(row.failed_events_24h ?? 0),
@@ -1770,11 +1138,10 @@ export async function fetchOperationsHealth(): Promise<OperationsHealth> {
 export async function fetchOperationsEvents(
   limit = 100
 ): Promise<OperationsEvent[]> {
-  const { data, error } = await db().rpc("admin_operations_events", {
-    p_limit: limit,
-  });
-  if (error) throw error;
-  return (data ?? []).map((row: Record<string, unknown>) => ({
+  const { events } = await backend<{ events: any[] }>(
+    `/v1/admin/operations/events?limit=${limit}`
+  );
+  return (events ?? []).map((row) => ({
     id: String(row.id),
     severity: row.severity as OperationsEvent["severity"],
     category: String(row.category),
@@ -1783,9 +1150,11 @@ export async function fetchOperationsEvents(
     entityType: row.entity_type ? String(row.entity_type) : null,
     entityId: row.entity_id ? String(row.entity_id) : null,
     detail:
-      row.detail && typeof row.detail === "object"
-        ? (row.detail as Record<string, unknown>)
-        : {},
+      row.detail && typeof row.detail === "string"
+        ? (JSON.parse(row.detail) as Record<string, unknown>)
+        : row.detail && typeof row.detail === "object"
+          ? (row.detail as Record<string, unknown>)
+          : {},
     resolvedAt: row.resolved_at ? String(row.resolved_at) : null,
     createdAt: String(row.created_at),
   }));

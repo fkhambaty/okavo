@@ -1,0 +1,16 @@
+name = "okavo-api"
+main = "src/index.js"
+compatibility_date = "2026-10-12"
+account_id = "ec00d4a6131c20118d82605d6b969c8e"
+workers_dev = true
+
+[vars]
+MAIL_FROM = "Okavo <support@okavo.org>"
+# Live Razorpay order creation stays off until a real merchant key is set
+# and RAZORPAY_PAYMENTS_ENABLED is exactly "true". Default: no charge.
+RAZORPAY_PAYMENTS_ENABLED = "false"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "okavo"
+database_id = "3d3afb8e-1749-4c70-8001-e115504e3b03"
