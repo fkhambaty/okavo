@@ -80,12 +80,12 @@ export const PAGES: PageSeo[] = [
     path: "/security",
     title: "Security and data handling at Okavo",
     description:
-      "How Okavo protects your money, your documents and your data: payments handled by Razorpay, row-level database isolation, private identity storage and regional data rules.",
+      "How Okavo protects your money, your documents and your data: payments handled by Razorpay, private identity files, and signed-in access checks.",
     indexed: true,
     priority: 0.7,
     h1: "Security and data handling",
     body: [
-      "Payments are handled by Razorpay (Okavo never sees card details). Database access uses row-level security. Identity documents sit in private storage. You can require data residency in the locked scope.",
+      "Payments are handled by Razorpay (Okavo never sees card details). The API checks the signed-in account on every request. Identity documents sit in private storage. You can require data residency in the locked scope.",
     ],
   },
   {

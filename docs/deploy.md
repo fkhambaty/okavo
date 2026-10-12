@@ -21,6 +21,7 @@ and Cloudflare Pages.
 | Files | D1 `files` + `file_chunks`. Not R2. 5 MB, jpeg/png/webp/pdf, private `GET /v1/files/:id`. Identity files are deleted 90 days after the admin decision. |
 | Exams | Worker routes under `/v1/exams`. Local heuristic score, no LLM key. |
 | Admins | `fakhruddinkhambaty@gmail.com` and `fktiindia@gmail.com` become `admin` on signup, verify, and login. Do not insert a password for them. |
+| Email | Resend domain `okavo.org` verified on 13 Oct 2026: DKIM TXT, SPF MX, SPF TXT, and the tracking CNAME. Signup mail from `support@okavo.org` can send. |
 
 Apply a new D1 file and deploy the Worker from `cloudflare/worker` after sourcing `~/.config/fk-products/cloudflare.env` (never print that file):
 

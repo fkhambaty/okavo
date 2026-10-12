@@ -36,11 +36,12 @@ export default function Privacy() {
           <h2>Identity-document retention</h2>
           <p>
             Identity files are kept in private storage while a review is open.
-            Ninety days after Okavo approves or rejects the verification, a
-            scheduled cleanup deletes the document and selfie, then replaces
-            their stored paths with a non-sensitive “purged” marker. The
-            verification decision itself may remain so the marketplace can
-            remember that the check happened.
+            Ninety days after Okavo approves or rejects the verification, the
+            document and selfie are deleted the next time an administrator
+            opens identity review or operations health, and their stored paths
+            are replaced with a non-sensitive “purged” marker. The verification
+            decision itself may remain so the marketplace can remember that the
+            check happened.
           </p>
 
           <h2>Payment evidence</h2>
@@ -63,8 +64,8 @@ export default function Privacy() {
           <p>
             We share data with infrastructure providers (hosting, database,
             email, Razorpay) as needed to operate the service. We do not sell
-            personal data. Buyers and developers see what the product role
-            allows under row-level security.
+            personal data. Buyers and developers see only what their signed-in
+            role is allowed to see.
           </p>
 
           <h2>Contact</h2>
