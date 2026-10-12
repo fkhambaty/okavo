@@ -1,5 +1,7 @@
 # Okavo — notes for an AI agent working in this repo
 
+Read [`ARCHITECTURE.md`](ARCHITECTURE.md) first if you are on a new computer. It is the map of hosting, DNS, database, payments, and the failures that look like bugs. This file is the editing contract. `docs/architecture/forma-platform.md` is an older thesis from before the rename to Okavo. It is not the running system.
+
 Okavo is a two-sided marketplace. Buyers describe software in plain language,
 sign a scope ("the lock"), and identity-verified developers bid on that exact
 scope. Live at <https://okavo.org>.

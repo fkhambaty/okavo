@@ -1,3 +1,7 @@
+# FORMA — older product thesis, not the running system
+
+The live product is **Okavo** (https://okavo.org). This file keeps the earlier FORMA thesis. For how the code, database, payments, and deploy actually work, read `ARCHITECTURE.md` at the repo root and `AGENTS.md`. Do not rename the running app back to FORMA, and do not treat the eight-domain model below as the current schema.
+
 # FORMA — End-to-End Platform Architecture
 
 **Working name:** FORMA  
