@@ -21,12 +21,12 @@ const CONTROLS = [
   {
     area: "Separation between accounts",
     detail:
-      "Isolation is enforced by the database itself through row-level security, not by application code. Even if a bug reached production, one buyer's query cannot return another buyer's contracts.",
+      "The API checks the signed-in account on every request. A buyer receives their own drafts, contracts, and payments. Other buyers do not. Verified developers see a locked public scope, not another company's private records.",
   },
   {
     area: "Identity documents",
     detail:
-      "Government IDs uploaded by developers go into private storage that is unreadable without an authorised, expiring link. They are reviewed by a person and are never shown to buyers. Ninety days after a decision, a scheduled cleanup deletes the files and redacts their stored paths.",
+      "Government IDs are stored privately. Only the developer who uploaded a file and Okavo admins can open it, and only while signed in. Buyers never see the document. Ninety days after a decision, the file is deleted and the stored path is marked purged.",
   },
   {
     area: "Operational alerts",
@@ -41,7 +41,7 @@ const CONTROLS = [
   {
     area: "Where your data lives",
     detail:
-      "Application data is hosted with Supabase on managed Postgres with encryption at rest and in transit, and the site is served over HTTPS only. If your organisation needs data to stay in a particular region, make it a line in your locked scope and developers bid against that requirement.",
+      "Accounts, projects, payments, and private files are stored in Cloudflare D1. The site and the API are served over HTTPS. Identity files are not on a public file host. If your organisation needs data to stay in a particular region, make it a line in your locked scope and developers bid against that requirement.",
   },
   {
     area: "Analytics",

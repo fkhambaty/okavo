@@ -159,7 +159,7 @@ export default function AppShell() {
             <span className={connected ? "conn-dot live" : "conn-dot"} />
             {connected
               ? loading
-                ? "Syncing with Supabase"
+                ? "Syncing your workspace"
                 : "Live database"
               : "Demo data"}
           </div>
