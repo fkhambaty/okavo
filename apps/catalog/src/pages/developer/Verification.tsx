@@ -31,6 +31,7 @@ export default function Verification() {
     email,
     userId,
     developerAccount,
+    payMembership,
     refresh,
     connected,
   } = useStore();
@@ -89,7 +90,8 @@ export default function Verification() {
 
   async function startMembershipCheckout() {
     if (!connected) {
-      setPayError("Payments are unavailable until the live backend is connected.");
+      setPayError(null);
+      payMembership();
       return;
     }
 
@@ -184,11 +186,14 @@ export default function Verification() {
                 >
                   {paying
                     ? "Opening payment…"
-                    : `Pay ${MEMBERSHIP_FEE_LABEL} and activate bidding`}
+                    : connected
+                      ? `Pay ${MEMBERSHIP_FEE_LABEL} and activate bidding`
+                      : "Activate demo bidding — no charge"}
                 </button>
                 <span className="hint">
-                  Secure payment by Razorpay. Okavo never sees your card details.{" "}
-                  {MEMBERSHIP_SETTLEMENT_HINT}
+                  {connected
+                    ? `Secure payment by Razorpay. Okavo never sees your card details. ${MEMBERSHIP_SETTLEMENT_HINT}`
+                    : "Demo mode simulates activation and never opens a payment window."}
                 </span>
               </div>
             )}

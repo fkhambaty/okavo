@@ -82,6 +82,32 @@ type AuthValue = {
 };
 
 const AuthContext = createContext<AuthValue | null>(null);
+const DEMO_SESSION_KEY = "okavo.demo.session";
+
+type DemoSession = {
+  role: Exclude<Role, "guest">;
+  displayName: string;
+};
+
+function readDemoSession(): DemoSession | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(DEMO_SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<DemoSession>;
+    if (
+      (parsed.role === "buyer" ||
+        parsed.role === "developer" ||
+        parsed.role === "admin") &&
+      typeof parsed.displayName === "string"
+    ) {
+      return { role: parsed.role, displayName: parsed.displayName };
+    }
+  } catch {
+    // A blocked or malformed session store should behave like a signed-out tab.
+  }
+  return null;
+}
 
 const SCALE_TO_DB: Record<BuyerScale, string> = {
   "Local business": "local_business",
@@ -91,11 +117,14 @@ const SCALE_TO_DB: Record<BuyerScale, string> = {
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const [initialDemoSession] = useState(readDemoSession);
   const [ready, setReady] = useState(!isSupabaseConfigured);
   const [session, setSession] = useState<Session | null>(null);
-  const [demoMode, setDemoMode] = useState(false);
-  const [role, setRole] = useState<Role>("guest");
-  const [displayName, setDisplayName] = useState("");
+  const [demoMode, setDemoMode] = useState(Boolean(initialDemoSession));
+  const [role, setRole] = useState<Role>(initialDemoSession?.role ?? "guest");
+  const [displayName, setDisplayName] = useState(
+    initialDemoSession?.displayName ?? ""
+  );
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
@@ -167,6 +196,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (demoMode) {
+      setReady(true);
+      return;
+    }
     if (!isSupabaseConfigured) {
       setReady(true);
       return;
@@ -192,7 +225,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshMemorySession().finally(() => setReady(true));
 
     return unsubscribe;
-  }, [ensureProfile]);
+  }, [demoMode, ensureProfile]);
 
   const signUp = useCallback(async (input: SignUpInput) => {
     setError(null);
@@ -304,15 +337,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       "session",
       null
     );
-    await receptionistSignOut();
+    if (!demoMode) {
+      await receptionistSignOut();
+    }
+    try {
+      window.sessionStorage.removeItem(DEMO_SESSION_KEY);
+    } catch {
+      // State still clears when storage is unavailable.
+    }
     setSession(null);
     setDemoMode(false);
     setRole("guest");
     setDisplayName("");
-  }, []);
+  }, [demoMode]);
 
   const demoSignIn = useCallback(
     (nextRole: Exclude<Role, "guest">, name: string) => {
+      try {
+        window.sessionStorage.setItem(
+          DEMO_SESSION_KEY,
+          JSON.stringify({ role: nextRole, displayName: name })
+        );
+      } catch {
+        // The in-memory demo still works when storage is unavailable.
+      }
       setDemoMode(true);
       setRole(nextRole);
       setDisplayName(name);

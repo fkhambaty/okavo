@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { DEVELOPER_LISTINGS } from "../../data";
 import * as api from "../../lib/api";
 import { formatRating } from "../../lib/reviewCriteria";
+import { useStore } from "../../store";
 import type { DeveloperListing, DeveloperTier } from "../../types";
 import { errorMessage } from "../../lib/errors";
 
@@ -31,6 +33,7 @@ const SORTS: { value: SortKey; label: string }[] = [
 ];
 
 export default function Developers() {
+  const { connected } = useStore();
   const [developers, setDevelopers] = useState<DeveloperListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +49,12 @@ export default function Developers() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      if (!connected) {
+        setDevelopers(DEVELOPER_LISTINGS);
+        setError(null);
+        setLoading(false);
+        return;
+      }
       try {
         const list = await api.fetchDeveloperDirectory();
         if (!cancelled) setDevelopers(list);
@@ -60,7 +69,7 @@ export default function Developers() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [connected]);
 
   const countries = useMemo(
     () =>
@@ -310,10 +319,12 @@ export default function Developers() {
 
                 {dev.reviewCount > 0 && (
                   <div className="dev-criteria">
-                    <span>
-                      Locked scope delivered{" "}
-                      <strong>{dev.lockedScopeRate}%</strong>
-                    </span>
+                    {dev.lockedScopeRate !== null && (
+                      <span>
+                        Locked scope delivered{" "}
+                        <strong>{dev.lockedScopeRate}%</strong>
+                      </span>
+                    )}
                     <span>
                       Scope <strong>{formatRating(dev.criteria.scope)}</strong>
                     </span>

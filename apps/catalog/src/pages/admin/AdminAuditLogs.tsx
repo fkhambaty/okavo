@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import * as api from "../../lib/api";
 import { errorMessage } from "../../lib/errors";
+import { useStore } from "../../store";
 
 const BUCKETS: {
   id: api.AuditAgeBucket;
@@ -33,6 +34,7 @@ function actionLabel(action: string) {
 }
 
 export default function AdminAuditLogs() {
+  const { connected } = useStore();
   const [bucket, setBucket] = useState<api.AuditAgeBucket>("7d");
   const [counts, setCounts] = useState<Record<api.AuditAgeBucket, number> | null>(
     null
@@ -42,6 +44,13 @@ export default function AdminAuditLogs() {
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async (next: api.AuditAgeBucket) => {
+    if (!connected) {
+      setCounts({ "7d": 0, "14d": 0, "30d": 0, older: 0 });
+      setRows([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -57,7 +66,7 @@ export default function AdminAuditLogs() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [connected]);
 
   useEffect(() => {
     void load(bucket);

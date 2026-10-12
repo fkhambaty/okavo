@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { DEVELOPER_LISTINGS } from "../../data";
 import * as api from "../../lib/api";
 import { REVIEW_CRITERIA, formatRating } from "../../lib/reviewCriteria";
+import { useStore } from "../../store";
 import type { DeveloperListing } from "../../types";
 import { errorMessage } from "../../lib/errors";
 
 export default function DeveloperProfile() {
   const { id } = useParams();
+  const { connected } = useStore();
   const [developer, setDeveloper] = useState<DeveloperListing | null>(null);
   const [reviews, setReviews] = useState<api.DeveloperReview[]>([]);
   const [loading, setLoading] = useState(true);
@@ -17,6 +20,13 @@ export default function DeveloperProfile() {
     let cancelled = false;
     setLoading(true);
     (async () => {
+      if (!connected) {
+        setDeveloper(DEVELOPER_LISTINGS.find((item) => item.id === id) ?? null);
+        setReviews([]);
+        setError(null);
+        setLoading(false);
+        return;
+      }
       try {
         const [listing, history] = await Promise.all([
           api.fetchDeveloperListing(id),
@@ -37,7 +47,7 @@ export default function DeveloperProfile() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [connected, id]);
 
   if (loading) {
     return (
@@ -111,9 +121,11 @@ export default function DeveloperProfile() {
             <div className="card">
               <div className="card-head">
                 <h2>How buyers scored them</h2>
-                <span className="badge badge-lock">
-                  Locked scope delivered {developer.lockedScopeRate}%
-                </span>
+                {developer.lockedScopeRate !== null && (
+                  <span className="badge badge-lock">
+                    Locked scope delivered {developer.lockedScopeRate}%
+                  </span>
+                )}
               </div>
               <div style={{ padding: "1.25rem" }}>
                 <div className="score-grid">
@@ -137,10 +149,15 @@ export default function DeveloperProfile() {
             <div style={{ padding: "1.25rem" }} className="stack-sm">
               {reviews.length === 0 && (
                 <div className="empty">
-                  <strong>No reviews yet</strong>
+                  <strong>
+                    {connected
+                      ? "No reviews yet"
+                      : "Review history is not included in demo data"}
+                  </strong>
                   <p>
-                    Reviews appear here only after a buyer closes a contract, so
-                    every one of them is attached to real, paid work.
+                    {connected
+                      ? "Reviews appear here only after a buyer closes a contract, so every one of them is attached to real, paid work."
+                      : "Live accounts show reviews attached to completed contracts."}
                   </p>
                 </div>
               )}

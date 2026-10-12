@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import * as api from "../../lib/api";
+import { useStore } from "../../store";
 
 type BlockRow = {
   id: string;
@@ -13,18 +14,24 @@ type BlockRow = {
 };
 
 export default function AdminBlocks() {
+  const { connected } = useStore();
   const [rows, setRows] = useState<BlockRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    if (!connected) {
+      setRows([]);
+      setError(null);
+      return;
+    }
     try {
       setError(null);
       setRows(await api.listBlockRequests("open"));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not load blocks");
     }
-  }, []);
+  }, [connected]);
 
   useEffect(() => {
     void load();

@@ -72,7 +72,8 @@ Fees and copy that quote money live in `apps/catalog/src/lib/pricing.ts`. Change
 - `npm run rls` refuses production. Destructive seeds refuse production unless `OKAVO_ALLOW_PRODUCTION_DESTRUCTIVE=1`.
 - The service-role key can read identity documents and payments. It belongs in `.okavo-agent`, never in git or in a chat log.
 - Sessions must stay on the Vercel auth receptionist. Do not put the session back in `localStorage`.
-- Test login `dummy` / `dummy` opens an isolated buyer demo in memory. It never creates a Supabase session, reads live rows, or grants developer/admin access; the workspace must label it `Demo data`.
+- Test login `dummy` / `dummy` opens an isolated buyer demo. The demo marker persists in `sessionStorage` so refreshes stay in the test workspace, while marketplace changes reset with the in-memory fixtures. It never creates a Supabase session, reads live rows, or grants developer/admin access; the workspace must label it `Demo data`.
+- Demo posting, hiring, and developer membership actions are simulations and must say `no charge`; they must never call Razorpay. Live authenticated accounts keep the real server-created Razorpay order and signature-confirmation path.
 - On 12 Oct 2026 the auth health URL for this project did not return a healthy response. Treat "the site is up" and "the database is up" as two different facts.
 
 Two database rules are the product:

@@ -2,6 +2,7 @@ import type {
   AppNotification,
   Developer,
   DeveloperAccount,
+  DeveloperListing,
   Project,
   Thread,
 } from "./types";
@@ -73,6 +74,27 @@ export const DEVELOPERS: Developer[] = [
     tier: "Principal",
   },
 ];
+
+export const DEVELOPER_LISTINGS: DeveloperListing[] = DEVELOPERS.map(
+  (developer) => ({
+    id: developer.id,
+    name: developer.name,
+    headline: developer.headline,
+    country: developer.country,
+    tier: developer.tier,
+    hourlyRate: developer.rate,
+    rating: developer.rating,
+    reviewCount: developer.delivered,
+    contractsDelivered: developer.delivered,
+    lockedScopeRate: null,
+    criteria: {
+      scope: null,
+      quality: null,
+      communication: null,
+      timeliness: null,
+    },
+  })
+);
 
 /** A developer who has verified identity but has not paid to bid yet. */
 export const NEW_DEVELOPER_ACCOUNT: DeveloperAccount = {

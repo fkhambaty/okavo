@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import ContractPanel from "../../components/ContractPanel";
+import { DEVELOPER_LISTINGS } from "../../data";
 import { initials, money } from "../../format";
 import * as api from "../../lib/api";
 import { collectFee } from "../../lib/checkout";
@@ -52,7 +53,12 @@ export default function BuyerProject() {
   }
 
   useEffect(() => {
-    if (!connected) return;
+    if (!connected) {
+      setRatings(
+        Object.fromEntries(DEVELOPER_LISTINGS.map((dev) => [dev.id, dev]))
+      );
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {

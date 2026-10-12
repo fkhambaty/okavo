@@ -7,8 +7,10 @@ import {
 } from "../../lib/exam";
 import { checkGuardrails } from "../../lib/guardrails";
 import { getAccessToken } from "../../lib/sessionClient";
+import { useStore } from "../../store";
 
 export default function AdminExams() {
+  const { connected } = useStore();
   const [rows, setRows] = useState<BuildExam[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -16,6 +18,12 @@ export default function AdminExams() {
   const [controlsBusy, setControlsBusy] = useState(false);
 
   const load = useCallback(async () => {
+    if (!connected) {
+      setRows([]);
+      setControls(null);
+      setError(null);
+      return;
+    }
     try {
       setError(null);
       const [exams, nextControls] = await Promise.all([
@@ -27,7 +35,7 @@ export default function AdminExams() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not load exams");
     }
-  }, []);
+  }, [connected]);
 
   useEffect(() => {
     void load();

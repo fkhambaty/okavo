@@ -320,7 +320,8 @@ export default function NewRequirement() {
     }
 
     if (!connected) {
-      setPublishError("Payments are unavailable in demo mode.");
+      setPublishError(null);
+      await publishNow();
       return;
     }
 
@@ -908,7 +909,9 @@ export default function NewRequirement() {
                   ? "Publishing…"
                   : saving
                     ? "Opening payment…"
-                    : `Pay ${POSTING_FEE_LABEL} and publish`}
+                    : connected
+                      ? `Pay ${POSTING_FEE_LABEL} and publish`
+                      : "Publish demo requirement — no charge"}
               </button>
             )}
           </div>

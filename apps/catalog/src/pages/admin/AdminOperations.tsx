@@ -2,20 +2,23 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { errorMessage } from "../../lib/errors";
 import * as api from "../../lib/api";
+import { useStore } from "../../store";
 
 export default function AdminOperations() {
+  const { connected } = useStore();
   const [health, setHealth] = useState<api.OperationsHealth | null>(null);
   const [events, setEvents] = useState<api.OperationsEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!connected) return;
     Promise.all([api.fetchOperationsHealth(), api.fetchOperationsEvents()])
       .then(([nextHealth, nextEvents]) => {
         setHealth(nextHealth);
         setEvents(nextEvents);
       })
       .catch((cause) => setError(errorMessage(cause)));
-  }, []);
+  }, [connected]);
 
   return (
     <>
@@ -34,6 +37,11 @@ export default function AdminOperations() {
       </header>
 
       <div className="content">
+        {!connected && (
+          <div className="card empty">
+            Demo data does not include live payment or retention operations.
+          </div>
+        )}
         {error && (
           <div className="callout callout-warn" role="alert">
             <span>!</span>
@@ -41,9 +49,9 @@ export default function AdminOperations() {
           </div>
         )}
 
-        {!health ? (
+        {connected && !health ? (
           <div className="card empty">Checking operations…</div>
-        ) : (
+        ) : health ? (
           <>
             <div className="stat-row">
               <div className="stat">
@@ -116,7 +124,7 @@ export default function AdminOperations() {
               </div>
             </div>
           </>
-        )}
+        ) : null}
       </div>
     </>
   );

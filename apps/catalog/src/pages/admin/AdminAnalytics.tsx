@@ -6,6 +6,7 @@ import HBar from "../../components/charts/HBar";
 import * as api from "../../lib/api";
 import { errorMessage } from "../../lib/errors";
 import type { NamedValue, TrendPoint } from "../../lib/chartMath";
+import { useStore } from "../../store";
 
 const RANGES = [
   { days: 1, label: "24 hours" },
@@ -56,12 +57,19 @@ function toBars(rows: api.BreakdownRow[], tone?: NamedValue["tone"]): NamedValue
 }
 
 export default function AdminAnalytics() {
+  const { connected } = useStore();
   const [days, setDays] = useState(30);
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async (range: number) => {
+    if (!connected) {
+      setData(null);
+      setError(null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -96,7 +104,7 @@ export default function AdminAnalytics() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [connected]);
 
   useEffect(() => {
     void load(days);
@@ -148,6 +156,11 @@ export default function AdminAnalytics() {
       </header>
 
       <div className="content">
+        {!connected && (
+          <div className="card empty">
+            Traffic analytics are available only for the live admin workspace.
+          </div>
+        )}
         {error && (
           <div className="callout callout-warn" role="alert" style={{ marginBottom: "1rem" }}>
             <span>!</span>
