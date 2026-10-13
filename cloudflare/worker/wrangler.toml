@@ -6,13 +6,13 @@ workers_dev = true
 
 [vars]
 MAIL_FROM = "Okavo <support@okavo.org>"
-# One FKTech Razorpay account serves Okavo, FunBerry and Data For Dummies.
-# RAZORPAY_KEY_SECRET and RAZORPAY_WEBHOOK_SECRET are Worker secrets.
-# Set RAZORPAY_PAYMENTS_ENABLED to anything but "true" to stop all charges.
-RAZORPAY_KEY_ID = "rzp_live_Tn7dYq8sfB9jgp"
-RAZORPAY_PAYMENTS_ENABLED = "true"
-# hosted = Razorpay Payment Link on razorpay.com (works before okavo.org is
-# approved for Standard Checkout). Set to "modal" after approval, then redeploy.
+# Okavo requires its own Razorpay merchant account because it is a marketplace.
+# Keep both settings disabled until that account is approved and its own
+# RAZORPAY_KEY_SECRET and RAZORPAY_WEBHOOK_SECRET have been installed.
+RAZORPAY_KEY_ID = ""
+RAZORPAY_PAYMENTS_ENABLED = "false"
+# hosted = Razorpay Payment Link on razorpay.com. Keep this mode until the new
+# marketplace merchant account approves okavo.org, then modal can be enabled.
 # The browser still falls back to the Payment Link if the modal is blocked.
 CHECKOUT_MODE = "hosted"
 # Settling pending payments from the cron stays off until this is "true".

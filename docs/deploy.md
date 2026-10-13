@@ -191,11 +191,15 @@ custom SMTP is configured. In Auth → SMTP Settings use GoDaddy mailbox SMTP:
 After SMTP is live, raise the email rate limit and brand the confirmation /
 OTP templates to mention `support@okavo.org`.
 
-## Payments (Razorpay is the live rail)
+## Payments (paused pending a separate marketplace merchant)
 
-Okavo, FunBerry Kids and Data For Dummies share one FKTech Razorpay account.
-Checkout shows **FKTech** as the merchant name, and the description names the
-Okavo fee being paid.
+Okavo must not use the FKTech EdTech Razorpay account used by FunBerry Kids and
+Data For Dummies. Razorpay rejected `okavo.org` because the marketplace does
+not match that account's category. Production therefore has an empty
+`RAZORPAY_KEY_ID` and `RAZORPAY_PAYMENTS_ENABLED = "false"`.
+
+Create and approve a separate Razorpay merchant account for Okavo before
+restoring checkout. Do not copy the education-account credentials into Okavo.
 
 Money is never written by the browser. The `okavo-api` Cloudflare Worker
 (`cloudflare/worker/src/payments.js`) decides every amount, creates the
@@ -210,7 +214,7 @@ the same row if the browser closes before confirmation.
 | `RAZORPAY_KEY_ID` | `wrangler.toml` var (public key id) |
 | `RAZORPAY_KEY_SECRET` | Worker secret |
 | `RAZORPAY_WEBHOOK_SECRET` | Worker secret; must match the Okavo webhook in Razorpay |
-| `RAZORPAY_PAYMENTS_ENABLED` | `wrangler.toml` var; anything but `true` stops order creation |
+| `RAZORPAY_PAYMENTS_ENABLED` | `wrangler.toml` var; keep `false` until the marketplace merchant is approved |
 
 ```bash
 cd cloudflare/worker
@@ -219,9 +223,10 @@ printf %s "$RAZORPAY_WEBHOOK_SECRET" | npx wrangler secret put RAZORPAY_WEBHOOK_
 npx wrangler deploy
 ```
 
-Webhook: `https://okavo-api.fkhambaty.workers.dev/v1/payments/razorpay/webhook`,
-event `payment.captured`, signed with `RAZORPAY_WEBHOOK_SECRET`. Each product
-has its own webhook URL and secret on the shared account.
+After the new account is approved, register
+`https://okavo-api.fkhambaty.workers.dev/v1/payments/razorpay/webhook` for
+`payment.captured` and `payment_link.paid`, signed with Okavo's new
+`RAZORPAY_WEBHOOK_SECRET`.
 
 Razorpay rejects live payments from websites that are not approved on the
 account. `https://okavo.org` must be listed under **Account & Settings →

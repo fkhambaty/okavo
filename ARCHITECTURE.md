@@ -6,7 +6,9 @@ Written 12 October 2026 so a different AI on a different computer can work witho
 
 Production no longer uses Supabase. The project `fzgnzaflvbimbiseqnrz` was deleted. Accounts, marketplace rows, and payment records live in the existing Cloudflare D1 database `okavo` (`3d3afb8e-1749-4c70-8001-e115504e3b03`) on account `ec00d4a6131c20118d82605d6b969c8e`. The API is the Worker `okavo-api` at `https://okavo-api.fkhambaty.workers.dev` (`cloudflare/worker`). The browser calls that Worker with a short-lived bearer token. The Vercel `/api/auth` routes still own the HttpOnly refresh cookie and never put the session in `localStorage`.
 
-Signup does not create a session until a 6-digit email code is confirmed. Password reset uses the same kind of code. Sending those codes requires the `okavo.org` domain to be verified in Resend. On 13 October 2026 that domain finished verification (DKIM TXT, SPF MX, SPF TXT, and the tracking CNAME were all verified). A real signup message to `delivered@resend.dev` was accepted and Resend reported it delivered. A profile inserted directly in D1 with `email_verified_at` set can still log in without waiting for the code. The Worker chooses Razorpay amounts. A payment is marked paid only after a verified signature and, when live charges are switched on, a captured Razorpay payment whose amount matches the stored order. Live charges are on: the Worker holds the FKTech live key (`RAZORPAY_KEY_ID` var, `RAZORPAY_KEY_SECRET` and `RAZORPAY_WEBHOOK_SECRET` secrets) with `RAZORPAY_PAYMENTS_ENABLED = "true"`. One FKTech Razorpay account serves Okavo, FunBerry Kids and Data For Dummies, and checkout shows FKTech as the merchant. Setting the flag to anything else stops order creation before Razorpay is called. The dummy login (`dummy` / `dummy`) stays in the browser, uses fixture rows, and never calls the Worker or Razorpay.
+Signup does not create a session until a 6-digit email code is confirmed. Password reset uses the same kind of code. Sending those codes requires the `okavo.org` domain to be verified in Resend. On 13 October 2026 that domain finished verification (DKIM TXT, SPF MX, SPF TXT, and the tracking CNAME were all verified). A real signup message to `delivered@resend.dev` was accepted and Resend reported it delivered. A profile inserted directly in D1 with `email_verified_at` set can still log in without waiting for the code.
+
+Okavo payments are disabled as of 13 October 2026. Razorpay rejected `okavo.org` on the FKTech EdTech merchant because Okavo is a marketplace. The Worker has an empty `RAZORPAY_KEY_ID` and `RAZORPAY_PAYMENTS_ENABLED = "false"`, so it refuses checkout before contacting Razorpay. Re-enable payments only after a separate marketplace merchant account approves `okavo.org`, then install that account's key id, key secret, and product-specific webhook secret. The Worker still owns amounts and only marks a payment paid after signature and provider checks. The dummy login (`dummy` / `dummy`) stays in the browser, uses fixture rows, and never calls the Worker or Razorpay.
 
 ```
 Browser
@@ -28,7 +30,7 @@ Analytics collection returns HTTP 503 with `{ error: "analytics_misconfigured", 
 
 R2 is not enabled (API error 10042). `cloudflare/d1/0003_storage_audit.sql` adds storage columns and a deletion audit. Uploads stay in D1 until a `FILES` binding exists. Health reports `storage: "d1"` and `r2Enabled: false` until then.
 
-`CHECKOUT_MODE` remains `hosted` until Razorpay approves okavo.org. `GET /v1/payments/quote` returns the server amount with `charge: false` and does not create a Razorpay order. Pending-payment reconciliation is report-only unless `ALLOW_PAYMENT_RECONCILIATION` is `"true"`.
+`CHECKOUT_MODE` remains `hosted` for the future marketplace merchant account. `GET /v1/payments/quote` returns the server amount with `charge: false` and does not create a Razorpay order. Pending-payment reconciliation is report-only unless `ALLOW_PAYMENT_RECONCILIATION` is `"true"`.
 
 Founder requirements are not seeded by a script. `docs/FOUNDER_SEEDING.md` is the hand workflow. Counts of zero are the honest state.
 
@@ -53,13 +55,13 @@ Exam starts are on. An admin can pause new starts or auto-approval from that pag
 
 ## Hosted checkout
 
-`CHECKOUT_MODE` defaults to `hosted` because okavo.org is not yet an approved website on the FKTech Razorpay account. In that mode the Worker creates a Razorpay Payment Link (`POST /v1/payment_links`) and the browser goes to Razorpay’s `short_url`. The description is `FKTech — <Okavo label>`. Notes are `{ payment_id, product: "okavo" }`. Notify is off. The callback is `https://okavo.org/app/payments/return`.
+Checkout is currently disabled. After a separate marketplace Razorpay account approves `okavo.org`, `CHECKOUT_MODE` should initially remain `hosted`. In that mode the Worker creates a Razorpay Payment Link (`POST /v1/payment_links`) and the browser goes to Razorpay's `short_url`. Notes are `{ payment_id, product: "okavo" }`. Notify is off. The callback is `https://okavo.org/app/payments/return`.
 
 On return, the page posts the query string to `POST /v1/payments/razorpay/link-return`. The Worker checks `HMAC_SHA256(key_secret, payment_link_id|payment_link_reference_id|payment_link_status|razorpay_payment_id)`, fetches the payment, and settles only when the amount and currency match. The webhook event `payment_link.paid` is a backup, as is `payment.captured`.
 
 If `CHECKOUT_MODE` is `modal`, Standard Checkout opens first. A website/domain-mismatch `payment.failed`, or a modal that never renders, falls back to the same Payment Link.
 
-To use the modal after Razorpay approves okavo.org, set the Worker variable and redeploy:
+To restore checkout after the marketplace account is approved, install that account's Worker secrets, set its public key id, change `RAZORPAY_PAYMENTS_ENABLED` to `"true"`, and redeploy. To use the modal after Razorpay also approves Standard Checkout for okavo.org, change the checkout mode:
 
 ```bash
 # in cloudflare/worker/wrangler.toml
