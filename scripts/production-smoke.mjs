@@ -41,6 +41,7 @@ else {
   );
   if (health.r2Enabled === true) fail("health claims R2 is enabled; this account is not");
   if (typeof health.mailConfigured !== "boolean") fail("health did not say whether mail is configured");
+  if (health.mailDomainVerified !== true) fail("sender domain is not verified in Resend; signup codes will not send");
 }
 
 const quoteResponse = await get(`${api}/v1/payments/quote?purpose=requirement_posting`);
@@ -75,8 +76,10 @@ try {
   if (await terms.count()) await terms.check();
   await page.getByRole("button", { name: "Continue" }).click();
   await page.waitForURL(/\/app/, { timeout: 15000 });
-  const text = await page.locator("body").innerText();
-  if (!/demo data/i.test(text)) fail("dummy login did not stay in the labelled demo workspace");
+  const labelled = await page
+    .waitForFunction(() => /demo data/i.test(document.body.innerText), null, { timeout: 10000 })
+    .then(() => true, () => false);
+  if (!labelled) fail("dummy login did not stay in the labelled demo workspace");
   else console.log("ok dummy login");
   await page.close();
 } catch (error) {

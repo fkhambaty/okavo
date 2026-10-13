@@ -85,6 +85,16 @@ import {
 import { confirmOrder, confirmPaymentLink, createHostedLink, createOrder, paymentStatus, quoteFee, reconcilePending, webhook } from "./payments.js";
 import { checkoutMode, mailConfigured, opsAuthStatus, secretConfigured, storageBackend } from "./pure.js";
 
+async function mailDomainVerified(env) {
+  if (!mailConfigured(env)) return false;
+  const domain = (String(env.MAIL_FROM).match(/@([^>\s]+)/) || [])[1]?.toLowerCase();
+  const response = await fetch("https://api.resend.com/domains", {
+    headers: { authorization: `Bearer ${env.RESEND_API_KEY}` },
+  }).catch(() => null);
+  if (!response || !response.ok) return null;
+  return ((await response.json()).data || []).some((d) => d.name === domain && d.status === "verified");
+}
+
 function match(path, pattern) {
   const names = [];
   const source = pattern
@@ -126,6 +136,7 @@ export default {
           storage: storageBackend(env),
           r2Enabled: storageBackend(env) === "r2",
           mailConfigured: mailConfigured(env),
+          mailDomainVerified: await mailDomainVerified(env),
           analyticsIngestConfigured: secretConfigured(env.ANALYTICS_INGEST_SECRET),
           paymentModel: "attestation",
         }, 200, origin);
