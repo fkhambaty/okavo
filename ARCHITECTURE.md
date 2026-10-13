@@ -10,13 +10,24 @@ Signup does not create a session until a 6-digit email code is confirmed. Passwo
 
 Okavo payments are disabled as of 13 October 2026. Razorpay rejected `okavo.org` on the FKTech EdTech merchant because Okavo is a marketplace. The Worker has an empty `RAZORPAY_KEY_ID` and `RAZORPAY_PAYMENTS_ENABLED = "false"`, so it refuses checkout before contacting Razorpay. Re-enable payments only after a separate marketplace merchant account approves `okavo.org`, then install that account's key id, key secret, and product-specific webhook secret. The Worker still owns amounts and only marks a payment paid after signature and provider checks. The dummy login (`dummy` / `dummy`) stays in the browser, uses fixture rows, and never calls the Worker or Razorpay.
 
+```mermaid
+flowchart LR
+  browser[Browser]
+  vercel["Vercel<br/>okavo.org"]
+  auth["Vercel /api/auth<br/>HttpOnly refresh cookie"]
+  worker["Worker<br/>okavo-api"]
+  d1["D1 database<br/>okavo"]
+  razor["Razorpay marketplace account<br/>not connected"]
+  mail["Resend<br/>okavo.org verified"]
+  browser --> vercel
+  vercel --> auth
+  auth --> worker
+  worker --> d1
+  worker -.-> razor
+  worker --> mail
 ```
-Browser
-  → Vercel (okavo.org) static app
-  → Vercel /api/auth (HttpOnly refresh cookie; access token stays in memory)
-  → Worker https://okavo-api.fkhambaty.workers.dev
-  → D1 database okavo
-```
+
+The dashed Razorpay line is intentional. Checkout is switched off until a separate marketplace merchant approves `okavo.org`. The access token stays in memory. It is not stored in `localStorage`.
 
 These routes stay unimplemented and return an error instead of invented data:
 
@@ -24,7 +35,7 @@ These routes stay unimplemented and return an error instead of invented data:
 - Stripe checkout and the old Razorpay reconcile cron.
 - Passwordless operator tokens. `scripts/okavo.mjs` database commands no longer talk to Supabase.
 
-Private files, build exams, owner admin promotion, and hosted checkout are live. See the sections below.
+Private files, build exams, and owner admin promotion are live. Checkout is not live. See the sections below.
 
 Analytics collection returns HTTP 503 with `{ error: "analytics_misconfigured", missing: [...] }` when `OKAVO_API_URL` or `ANALYTICS_INGEST_SECRET` is absent. It does not return a silent 204 for that case. The response names the missing settings and does not include the secret. The Worker answers 503 when its own ingest secret is missing and 401 when the header does not match.
 
@@ -181,3 +192,9 @@ The viewport matrix and how to run it are in `docs/responsive.md`.
 - Do not say Okavo holds escrow or guarantees delivery. It does not.
 - Fees are shown in USD. Razorpay collects the INR equivalent until a USD processor is live.
 - Trademark clearance for the name was still outstanding when this guide was written. Do not claim the name is cleared.
+
+## If this computer is gone
+
+`https://github.com/fkhambaty/okavo` is the copy that matters. It contains this guide, `AGENTS.md`, `docs/deploy.md`, the catalog app, the Worker, and the D1 schema. Vercel rebuilds the website from that repository.
+
+These names are Worker secrets and are not stored in Git: `RESEND_API_KEY`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `ANALYTICS_INGEST_SECRET`, and `OPS_CRON_SECRET`. They remain in Cloudflare even if this laptop is lost. `RAZORPAY_KEY_ID` is blank in `wrangler.toml` on purpose, and `RAZORPAY_PAYMENTS_ENABLED` is `false`. A local copy under `~/.config/fk-products/` is only a convenience and must never be committed. Do not put the old EdTech Razorpay key back into Okavo.
