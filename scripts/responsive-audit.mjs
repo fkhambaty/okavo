@@ -483,7 +483,15 @@ async function main() {
         }
         if (capture) {
           const file = `${role}-${route.replace(/[^\w]+/g, "-")}-${viewport.name}-hydration.png`;
-          await page.screenshot({ path: join(SHOTS, file) });
+          try {
+            await page.screenshot({ path: join(SHOTS, file) });
+          } catch {
+            // A remote page can still be painting when CDP asks for the first
+            // frame. The layout assertions below are authoritative; retry the
+            // optional visual artifact after the page settles.
+            await page.waitForTimeout(250);
+            await page.screenshot({ path: join(SHOTS, file) }).catch(() => {});
+          }
         }
         if (!response) problems.push(`${label} returned no response`);
         else if (response.status() >= 400) problems.push(`${label} HTTP ${response.status()}`);
