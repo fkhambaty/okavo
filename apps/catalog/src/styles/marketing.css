@@ -1738,6 +1738,11 @@
 }
 
 @media (max-width: 900px) {
+  .hero.hero-ledger {
+    background-image: linear-gradient(transparent 31px, rgba(12, 13, 16, 0.06) 32px);
+    background-size: 100% 32px;
+  }
+
   .hero.hero-ledger .ledger-title {
     max-width: none;
     font-size: clamp(2.5rem, 12vw, 3.6rem);
