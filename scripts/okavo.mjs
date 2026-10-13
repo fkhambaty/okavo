@@ -24,6 +24,7 @@
  * The difference between those two is where most access bugs hide.
  */
 
+import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -182,6 +183,25 @@ const commands = {
     out(text ? JSON.parse(text) : null);
   },
 
+  /**
+   * Phone, tablet, desktop, and orientation pass. See scripts/responsive-audit.mjs.
+   * Builds must already exist unless --base points at a running server.
+   */
+  async responsive(args) {
+    await new Promise((resolve, reject) => {
+      const child = spawn(
+        process.execPath,
+        [join(ROOT, "scripts/responsive-audit.mjs"), ...args],
+        { stdio: "inherit" }
+      );
+      child.on("error", reject);
+      child.on("exit", (code) => {
+        if (code) reject(new Error(`responsive audit exited ${code}`));
+        else resolve();
+      });
+    });
+  },
+
   /** Open a screen in a real browser as a given user and save a screenshot. */
   async shot(args) {
     const path = args[0] ?? "/";
@@ -235,6 +255,7 @@ Okavo agent console
 
   screens                        Every route and who is allowed to see it
   shot <path>                    Screenshot a public screen
+  responsive [--base URL]       Phone, tablet, desktop, and orientation audit
   check, accounts, token, as, db, sql, shot --as
                                  Retired. They talked to the deleted Supabase project.
 

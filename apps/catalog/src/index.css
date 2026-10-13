@@ -113,12 +113,18 @@ html {
   text-size-adjust: 100%;
   color-scheme: light;
   scroll-behavior: smooth;
+  height: 100%;
+  /* Clip sideways scroll on the document, not on body. overflow-x:clip on
+     body makes the other axis a scrollport and cuts off position:fixed
+     drawers, backdrops, and dialogs. */
+  overflow-x: clip;
+  overflow-y: auto;
 }
 
 html,
 body,
 #root {
-  height: 100%;
+  min-height: 100%;
 }
 
 body {
@@ -130,7 +136,19 @@ body {
   -webkit-font-smoothing: antialiased;
   font-variant-numeric: tabular-nums;
   line-height: var(--leading);
-  overflow-x: clip;
+  overflow: visible;
+  width: 100%;
+}
+
+body.scroll-lock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  width: 100%;
+}
+
+html:has(body.scroll-lock) {
+  overflow: hidden;
 }
 
 ::selection {
@@ -147,11 +165,6 @@ body {
   outline: none;
 }
 
-body.nav-drawer-open,
-body.market-menu-open {
-  overflow: hidden;
-}
-
 a {
   color: inherit;
   text-decoration: none;
@@ -163,6 +176,15 @@ select,
 textarea {
   font: inherit;
   color: inherit;
+}
+
+button,
+a,
+input,
+select,
+textarea,
+label {
+  touch-action: manipulation;
 }
 
 h1,
@@ -283,6 +305,9 @@ p {
   position: sticky;
   top: 0;
   z-index: 20;
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 .market-nav-inner {
@@ -714,9 +739,13 @@ p {
 /* ---------- auth ---------- */
 .auth-screen {
   min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   place-items: center;
-  padding: 2.5rem 1.25rem;
+  padding: max(2.5rem, env(safe-area-inset-top))
+    max(1.25rem, env(safe-area-inset-right))
+    max(2.5rem, env(safe-area-inset-bottom))
+    max(1.25rem, env(safe-area-inset-left));
 }
 
 .auth-card {
@@ -870,6 +899,8 @@ p {
   color: var(--paper);
   font-size: 1.6rem;
   line-height: 1;
+  min-width: 44px;
+  min-height: 44px;
   padding: 0.25rem 0.55rem;
   cursor: pointer;
   border-radius: 7px;
@@ -886,8 +917,8 @@ p {
 }
 
 .menu-toggle {
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -1769,8 +1800,10 @@ td code,
   font-size: 0.8125rem;
 }
 
-.card:has(table) {
+.card:has(table),
+.ex-surface:has(table) {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ---------- verification ---------- */
@@ -3132,7 +3165,9 @@ td code,
 .footer {
   border-top: 1px solid var(--line);
   background: var(--paper);
-  padding: 3rem 0 1.75rem;
+  padding: 3rem max(0px, env(safe-area-inset-right))
+    max(1.75rem, env(safe-area-inset-bottom))
+    max(0px, env(safe-area-inset-left));
   color: var(--muted);
   font-size: var(--text-sm);
 }
@@ -4352,6 +4387,9 @@ td code,
     transition: transform 0.2s ease;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    padding-top: max(1.2rem, env(safe-area-inset-top));
+    padding-bottom: max(1.2rem, env(safe-area-inset-bottom));
+    padding-left: max(0.85rem, env(safe-area-inset-left));
   }
 
   .app.nav-open .sidebar {
@@ -4400,6 +4438,9 @@ td code,
 
   .content {
     padding: 1rem;
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
   }
 
   .db-error {
@@ -4407,13 +4448,27 @@ td code,
     flex-wrap: wrap;
   }
 
-  .card:has(> table),
-  .card-pad:has(> table) {
+  .card:has(table),
+  .card-pad:has(table),
+  .ex-surface:has(table) {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    box-shadow: inset -14px 0 12px -12px rgba(12, 13, 16, 0.28);
   }
 
-  table {
+  .card:has(table)::before,
+  .ex-surface:has(table)::before {
+    content: "Swipe sideways to see every column";
+    position: sticky;
+    left: 0;
+    display: block;
+    width: fit-content;
+    padding: 0.55rem 1rem 0.15rem;
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+
+  table:not(.ex-compare) {
     min-width: 560px;
   }
 
@@ -4911,6 +4966,15 @@ td code,
     scroll-behavior: auto;
   }
 
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
   .area-trend-area,
   .area-trend-line,
   .area-trend-dot,
@@ -5249,10 +5313,10 @@ input[type="radio"] {
 /* ---------- idle warning ---------- */
 .idle-dialog {
   position: fixed;
-  right: 1rem;
-  bottom: 1rem;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, env(safe-area-inset-bottom));
   z-index: 10000;
-  width: min(22rem, calc(100vw - 2rem));
+  width: min(22rem, calc(100vw - 2rem - env(safe-area-inset-left) - env(safe-area-inset-right)));
   padding: 1rem 1.1rem 1.05rem;
   border-radius: var(--radius-lg);
   background: var(--ink);
@@ -5312,9 +5376,73 @@ input[type="radio"] {
   }
 
   .idle-dialog {
-    right: 0.75rem;
-    left: 0.75rem;
+    right: max(0.75rem, env(safe-area-inset-right));
+    left: max(0.75rem, env(safe-area-inset-left));
     width: auto;
+  }
+}
+
+@media (max-width: 1180px) {
+  .btn,
+  .tab,
+  .side-link,
+  .side-signout,
+  .menu-close,
+  .thread-item,
+  .role-option,
+  .option-card,
+  .link-button,
+  .market-menu-inner > a {
+    min-height: 44px;
+  }
+
+  .menu-toggle {
+    width: 44px;
+    height: 44px;
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="image"]),
+  select,
+  textarea {
+    font-size: 16px;
+    min-height: 44px;
+  }
+
+  .check,
+  .terms-check {
+    min-height: 44px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .hero {
+    padding-top: 1.5rem;
+  }
+
+  .hero-grid {
+    padding-bottom: 1.5rem;
+  }
+
+  .auth-screen {
+    place-items: start center;
+    padding-top: max(0.75rem, env(safe-area-inset-top));
+  }
+
+  .auth-layout {
+    gap: 1rem;
+  }
+
+  .auth-aside h2 {
+    font-size: 1.35rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .mobile-bar {
+    height: 48px;
+  }
+
+  .page-hero {
+    padding: 2rem 0 1.5rem;
   }
 }
 

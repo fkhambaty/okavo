@@ -4,6 +4,7 @@ import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "../brand";
 import Logo from "./Logo";
 import { initials } from "../format";
 import { MEMBERSHIP_FEE_LABEL } from "../lib/pricing";
+import { lockPageScroll } from "../lib/scrollLock";
 import { useStore } from "../store";
 
 const BUYER_NAV = [
@@ -65,8 +66,8 @@ export default function AppShell() {
   }, [location.pathname]);
 
   useEffect(() => {
-    document.body.classList.toggle("nav-drawer-open", navOpen);
-    return () => document.body.classList.remove("nav-drawer-open");
+    if (!navOpen) return;
+    return lockPageScroll();
   }, [navOpen]);
 
   // Await the sign-out first: navigating while the session is still live
@@ -175,18 +176,18 @@ export default function AppShell() {
             <span className="side-user-text">
               <strong>{name}</strong>
               <span>
-                {demoMode
+                {demoMode && isBuyer
                   ? "Principal · lifetime"
                   : isAdmin
-                  ? "Administrator"
-                  : isBuyer
-                    ? "Buyer"
-                    : developerAccount.membershipPaid &&
-                        developerAccount.identityStatus === "approved"
-                      ? `${developerAccount.tier} · bidding active`
-                      : developerAccount.membershipPaid
-                        ? `${developerAccount.tier} · ID required to bid`
-                        : `${developerAccount.tier} · bidding locked`}
+                    ? "Administrator"
+                    : isBuyer
+                      ? "Buyer"
+                      : developerAccount.membershipPaid &&
+                          developerAccount.identityStatus === "approved"
+                        ? `${developerAccount.tier} · bidding active`
+                        : developerAccount.membershipPaid
+                          ? `${developerAccount.tier} · ID required to bid`
+                          : `${developerAccount.tier} · bidding locked`}
               </span>
             </span>
           </div>

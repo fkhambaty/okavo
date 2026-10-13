@@ -13,6 +13,7 @@ import { isBackendConfigured } from "./lib/backend";
 import { MEMBERSHIP_FEE_MINOR, POSTING_FEE_MINOR } from "./lib/pricing";
 import {
   DUMMY_DEVELOPER_ACCOUNT,
+  FIXTURE_DEVELOPER_ACCOUNT,
   NEW_DEVELOPER_ACCOUNT,
   NOTIFICATIONS,
   PROJECTS,
@@ -212,7 +213,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setProjects(PROJECTS);
       setThreads(THREADS);
       setNotifications(NOTIFICATIONS);
-      setDeveloperAccount(DUMMY_DEVELOPER_ACCOUNT);
+      setDeveloperAccount(
+        auth.role === "developer"
+          ? FIXTURE_DEVELOPER_ACCOUNT
+          : DUMMY_DEVELOPER_ACCOUNT
+      );
       setPostingFeesPaid(0);
       setError(null);
       setHydrated(true);
@@ -224,7 +229,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setNotifications([]);
       setHydrated(false);
     }
-  }, [auth.demoMode, auth.userId]);
+  }, [auth.demoMode, auth.userId, auth.role]);
 
   const refresh = useCallback(async () => {
     if (!live || !auth.userId) return;

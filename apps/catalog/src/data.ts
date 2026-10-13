@@ -96,6 +96,19 @@ export const DEVELOPER_LISTINGS: DeveloperListing[] = DEVELOPERS.map(
   })
 );
 
+/**
+ * Developer fixture session used by the responsive audit.
+ * Not the dummy buyer. Identity, exam, and membership stay unfinished
+ * so the upload and exam forms render, and checkout stays "no charge".
+ */
+export const FIXTURE_DEVELOPER_ACCOUNT: DeveloperAccount = {
+  identityStatus: "not_started",
+  interviewStatus: "not_started",
+  membershipPaid: false,
+  tier: "Applicant",
+  interviewScores: [],
+};
+
 /** The dummy login. Top tier, already unlocked, and never billed. */
 export const DUMMY_DEVELOPER_ACCOUNT: DeveloperAccount = {
   identityStatus: "approved",

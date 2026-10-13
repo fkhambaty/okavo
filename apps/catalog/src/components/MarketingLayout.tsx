@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, NavLink } from "react-router-dom";
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "../brand";
+import { lockPageScroll } from "../lib/scrollLock";
 import Logo from "./Logo";
 
 const NAV = [
@@ -16,8 +17,8 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
-    document.body.classList.toggle("market-menu-open", menuOpen);
-    return () => document.body.classList.remove("market-menu-open");
+    if (!menuOpen) return;
+    return lockPageScroll();
   }, [menuOpen]);
 
   const close = () => setMenuOpen(false);

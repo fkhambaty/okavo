@@ -106,6 +106,9 @@ cd apps/catalog && npx tsc -b --force   # `tsc --noEmit` alone does NOT check th
 npm run build                            # also prerenders the marketing pages
 npm run lint
 npm run typecheck
+npm test                                 # Worker pure tests
+VITE_OKAVO_API_URL=https://okavo-api.fkhambaty.workers.dev npm run build
+npm run responsive                       # after that build; see docs/responsive.md
 ```
 
 `npx tsc --noEmit` silently passes because the project uses TypeScript project

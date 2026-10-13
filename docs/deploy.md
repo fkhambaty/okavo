@@ -13,7 +13,8 @@ and Cloudflare Pages.
 
 | Piece | Where |
 |-------|--------|
-| Site | https://okavo.org — Vercel project `pro-catalog`, root `apps/catalog`. Push to `main` deploys it. |
+| Site | https://okavo.org — Vercel project `pro-catalog`, root `apps/catalog`. Push to `main` deploys it. `www` is a 308 to the apex. Do not change GoDaddy DNS from this repo. |
+| Responsive | `docs/responsive.md`. `npm run responsive` after a build that includes `VITE_OKAVO_API_URL`. |
 | API | Worker `okavo-api` at https://okavo-api.fkhambaty.workers.dev |
 | Database | D1 `okavo` (`3d3afb8e-1749-4c70-8001-e115504e3b03`) |
 | Schema | `cloudflare/d1/0001_okavo.sql`, then `cloudflare/d1/0002_files_exams_checkout.sql` |

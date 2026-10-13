@@ -161,6 +161,10 @@ The catalog UI is a warm editorial system: paper (`--paper`, `--bg`), ink (`--in
 
 Prefer the semantic aliases (`--text`, `--border`, `--focus-ring`, `--on-ink`, `--measure`) over new hex values. Status colours stay honest: green is a lock or a live connection, amber is attention, red is a real failure. Do not add testimonials, counts, logos, escrow, or a delivery guarantee in the visual layer. Motion is short (`--dur`) and turns off under `prefers-reduced-motion`. Prices stay in `apps/catalog/src/lib/pricing.ts`. Security copy stays in the page source and in `apps/catalog/src/content/trust.ts`.
 
+Horizontal clipping lives on `html`, not `body`. A clip or hidden overflow on `body` becomes a scrollport and cuts off the fixed workspace drawer, the marketing menu lock, and the idle dialog. Opening either menu calls `lockPageScroll` (`apps/catalog/src/lib/scrollLock.ts`), which pins the page with `position: fixed` and does not set `overflow` on `body`. Wide tables sit in a sideways-scrolling card with a “Swipe sideways” hint below 1000px. Text inputs are 16px through 1180px wide so iOS does not zoom them. Controls that people tap are at least 44px tall through that same width. Safe-area insets pad the marketing bar, footer, auth frame, workspace drawer, and idle dialog. Landscape phones shorter than 500px tighten the hero and the sign-in frame. The dummy login (`dummy` / `dummy`) stays a buyer labelled `Principal · lifetime` and never starts a charge. The developer fixture session is a different demo role: identity and membership are unfinished so the upload and exam forms can be checked, and its membership button says no charge.
+
+The viewport matrix and how to run it are in `docs/responsive.md`.
+
 ## What not to get wrong
 
 - Do not invent testimonials, country counts, or customer logos. A fake "74 countries" claim was removed once already.

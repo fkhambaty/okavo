@@ -81,6 +81,8 @@ export default function SignIn() {
     return <Navigate to="/app" replace />;
   }
 
+  const previewVerification =
+    new URLSearchParams(window.location.search).get("verify") === "1";
   const notice = auth.notice ?? idleNotice;
 
   async function submit() {
@@ -332,7 +334,7 @@ export default function SignIn() {
           </>
         )}
 
-        {auth.pendingVerification && (
+        {(auth.pendingVerification || previewVerification) && (
           <div className="field">
             <label htmlFor="verifyCode">Confirmation code</label>
             <input

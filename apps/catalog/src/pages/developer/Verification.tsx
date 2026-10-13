@@ -379,6 +379,35 @@ export default function Verification() {
                         ? "Start 5-hour build exam"
                         : "Approve ID first"}
                   </button>
+                  {!connected && (
+                    <>
+                      <p className="hint">
+                        Demo data. These fields show the exam layout. Nothing
+                        here starts the five-hour timer or contacts Okavo.
+                      </p>
+                      <div className="field">
+                        <label htmlFor="gh">GitHub / GitLab URL</label>
+                        <input
+                          id="gh"
+                          value={githubUrl}
+                          onChange={(e) => setGithubUrl(e.target.value)}
+                          placeholder="https://github.com/you/exam-app"
+                        />
+                      </div>
+                      <div className="field">
+                        <label htmlFor="live">Live URL</label>
+                        <input
+                          id="live"
+                          value={liveUrl}
+                          onChange={(e) => setLiveUrl(e.target.value)}
+                          placeholder="https://your-app.vercel.app"
+                        />
+                      </div>
+                      <button type="button" className="btn" disabled>
+                        Submit exam — demo only
+                      </button>
+                    </>
+                  )}
                 </>
               )}
 
