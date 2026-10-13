@@ -501,6 +501,80 @@ async function paymentFromLinkEvent(env, event) {
   return { link, payment };
 }
 
+export function quoteFee(env, purpose) {
+  const fee = fixedFee(purpose);
+  if (!fee) throw new HttpError(400, "Unknown payment purpose");
+  return {
+    purpose,
+    amount: fee.amount,
+    currency: CHARGE_CURRENCY,
+    label: fee.label,
+    checkout: checkoutMode(env),
+    charge: false,
+    paymentsConfigured: paymentsLive(env),
+    note: "Quote only. No Razorpay order was created and nothing was charged.",
+  };
+}
+
+export async function reconcilePending(db, env, { apply = false } = {}) {
+  const cutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+  const pending = await db
+    .prepare(
+      `SELECT * FROM payments
+        WHERE status = 'pending' AND provider = 'razorpay' AND created_at < ?
+        ORDER BY created_at`,
+    )
+    .bind(cutoff)
+    .all();
+  const rows = pending.results || [];
+  const report = {
+    pending: rows.length,
+    settled: 0,
+    unchanged: 0,
+    mismatched: 0,
+    apply: false,
+    checkout: checkoutMode(env),
+    charge: false,
+  };
+  if (!apply || env?.ALLOW_PAYMENT_RECONCILIATION !== "true") {
+    return { ...report, reason: apply ? "reconciliation_is_report_only" : "report_only" };
+  }
+  if (!paymentsLive(env)) return { ...report, apply: false, reason: "payments_not_configured" };
+  report.apply = true;
+  for (const row of rows) {
+    let remote = null;
+    try {
+      if (row.provider_payment_id) {
+        remote = await capturedPayment(env, row.provider_payment_id);
+      } else if (row.provider_link_id) {
+        const link = await razorpay(env, `/v1/payment_links/${encodeURIComponent(row.provider_link_id)}`, null, "GET");
+        const paymentId = link?.payments?.[0]?.payment_id || link?.payments?.[0]?.id || null;
+        if (link?.status === "paid" && paymentId) remote = await capturedPayment(env, paymentId);
+      }
+    } catch {
+      report.unchanged += 1;
+      continue;
+    }
+    if (!remote || String(remote.status || "") !== "captured" || !remote.id) {
+      report.unchanged += 1;
+      continue;
+    }
+    const result = await settlePayment(db, {
+      paymentId: row.id,
+      provider: "razorpay",
+      orderId: String(remote.order_id || row.provider_order_id || row.provider_link_id || row.id),
+      linkId: row.provider_link_id || undefined,
+      providerPaymentId: String(remote.id),
+      amountCents: Number(remote.amount),
+      currency: String(remote.currency || ""),
+    });
+    if (result === "settled" || result === "already_paid") report.settled += 1;
+    else if (result === "mismatch") report.mismatched += 1;
+    else report.unchanged += 1;
+  }
+  return report;
+}
+
 export async function paymentStatus(db, user, paymentId) {
   requireUser(user);
   const row = await db

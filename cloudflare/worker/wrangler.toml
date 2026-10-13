@@ -12,11 +12,25 @@ MAIL_FROM = "Okavo <support@okavo.org>"
 RAZORPAY_KEY_ID = "rzp_live_Tn7dYq8sfB9jgp"
 RAZORPAY_PAYMENTS_ENABLED = "true"
 # hosted = Razorpay Payment Link on razorpay.com (works before okavo.org is
-# approved for Standard Checkout). Set to "modal" after approval.
+# approved for Standard Checkout). Set to "modal" after approval, then redeploy.
+# The browser still falls back to the Payment Link if the modal is blocked.
 CHECKOUT_MODE = "hosted"
+# Settling pending payments from the cron stays off until this is "true".
+# The daily job still reports pending rows without charging or settling.
+ALLOW_PAYMENT_RECONCILIATION = "false"
 ADMIN_EMAILS = "fakhruddinkhambaty@gmail.com,fktiindia@gmail.com"
+
+[triggers]
+crons = ["17 3 * * 1", "47 4 * * *"]
 
 [[d1_databases]]
 binding = "DB"
 database_name = "okavo"
 database_id = "3d3afb8e-1749-4c70-8001-e115504e3b03"
+
+# R2 is not enabled on this Cloudflare account (API error 10042).
+# Do not add a bucket binding until the account can create one.
+# Identity and proof files stay in D1. When R2 is enabled, add:
+# [[r2_buckets]]
+# binding = "FILES"
+# bucket_name = "okavo-private"

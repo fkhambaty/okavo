@@ -327,11 +327,11 @@ export default function ContractPage() {
                 <div className="callout callout-info">
                   <span>i</span>
                   <span>
-                    Trust path without escrow: developer submits proof → you
-                    accept against the signed scope → you pay that milestone
-                    outside Okavo → you confirm payment here. Never pay the full
-                    build up front. First milestone is capped at ~20%. Okavo does
-                    not hold or refund build money.
+                    Payment attestation, not escrow. The developer submits
+                    proof, you accept it against the signed scope, you pay that
+                    milestone yourself, then you record the payment here. Never
+                    pay the full build up front. The first milestone is capped
+                    near 20%. Okavo does not hold or refund build money.
                   </span>
                 </div>
 

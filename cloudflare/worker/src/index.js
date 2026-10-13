@@ -24,7 +24,7 @@ import {
   startExam,
   submitExam,
 } from "./exams.js";
-import { readPrivateFile } from "./files.js";
+import { purgeExpiredIdentityFiles, readPrivateFile } from "./files.js";
 import { allowedOrigin, fileResponse, HttpError, json, readJson } from "./http.js";
 import {
   acceptInvite,
@@ -52,6 +52,7 @@ import {
   fundMilestone,
   hireFeePaid,
   insights,
+  liquidity,
   inviteBuilder,
   leaveReview,
   listBlocks,
@@ -81,7 +82,8 @@ import {
   verificationQueue,
   writeClientAudit,
 } from "./marketplace.js";
-import { confirmOrder, confirmPaymentLink, createHostedLink, createOrder, paymentStatus, webhook } from "./payments.js";
+import { confirmOrder, confirmPaymentLink, createHostedLink, createOrder, paymentStatus, quoteFee, reconcilePending, webhook } from "./payments.js";
+import { checkoutMode, mailConfigured, opsAuthStatus, secretConfigured, storageBackend } from "./pure.js";
 
 function match(path, pattern) {
   const names = [];
@@ -116,7 +118,20 @@ export default {
 
     try {
       if (request.method === "GET" && path === "/v1/health") {
-        return json({ ok: true, service: "okavo", payments: env.RAZORPAY_PAYMENTS_ENABLED === "true" }, 200, origin);
+        return json({
+          ok: true,
+          service: "okavo",
+          payments: env.RAZORPAY_PAYMENTS_ENABLED === "true",
+          checkout: checkoutMode(env),
+          storage: storageBackend(env),
+          r2Enabled: storageBackend(env) === "r2",
+          mailConfigured: mailConfigured(env),
+          analyticsIngestConfigured: secretConfigured(env.ANALYTICS_INGEST_SECRET),
+          paymentModel: "attestation",
+        }, 200, origin);
+      }
+      if (request.method === "GET" && path === "/v1/payments/quote") {
+        return json(quoteFee(env, url.searchParams.get("purpose") || ""), 200, origin);
       }
 
       if (request.method === "POST" && path === "/v1/auth/signup") {
@@ -150,6 +165,17 @@ export default {
       }
       if (request.method === "POST" && path === "/v1/payments/razorpay/webhook") {
         return json(await webhook(db, env, request, await request.text()), 200, origin);
+      }
+      if (request.method === "POST" && (path === "/v1/ops/reconcile" || path === "/v1/ops/retention")) {
+        const auth = opsAuthStatus(env, request.headers.get("x-okavo-ops") || "");
+        if (auth === "misconfigured") return json({ error: "ops_secret_missing" }, 503, origin);
+        if (auth !== "ok") return json({ error: "Unauthorized" }, 401, origin);
+        if (path === "/v1/ops/retention") {
+          const purged = await purgeExpiredIdentityFiles(db, env);
+          return json({ ok: true, purged, storage: storageBackend(env) }, 200, origin);
+        }
+        const body = await readJson(request);
+        return json(await reconcilePending(db, env, { apply: body?.apply === true }), 200, origin);
       }
 
       const user = await userFromRequest(request, db);
@@ -196,7 +222,7 @@ export default {
       params = match(path, "/v1/milestones/:id/accept");
       if (request.method === "POST" && params) return json(await acceptMilestone(db, user, params.id), 200, origin);
       params = match(path, "/v1/milestones/:id/fund");
-      if (request.method === "POST" && params) return json(await fundMilestone(db, user, params.id, await readJson(request)), 200, origin);
+      if (request.method === "POST" && params) return json(await fundMilestone(db, user, params.id, await readJson(request), env), 200, origin);
       if (request.method === "GET" && path === "/v1/milestone-proofs") {
         const ids = (url.searchParams.get("ids") || "").split(",").map((item) => item.trim()).filter(Boolean).slice(0, 50);
         return json(await externalProofs(db, user, ids), 200, origin);
@@ -229,18 +255,19 @@ export default {
       params = match(path, "/v1/blocks/:id/review");
       if (request.method === "POST" && params) return json(await reviewBlock(db, user, params.id, await readJson(request)), 200, origin);
       if (request.method === "POST" && path === "/v1/identity") {
-        return json(await submitIdentity(db, user, await readJson(request)), 201, origin);
+        return json(await submitIdentity(db, user, await readJson(request), env), 201, origin);
       }
       params = match(path, "/v1/files/:id");
       if (request.method === "GET" && params) {
-        const file = await readPrivateFile(db, user, params.id);
+        const file = await readPrivateFile(db, user, params.id, env);
         return fileResponse(file.bytes, file.mime, origin);
       }
-      if (request.method === "GET" && path === "/v1/admin/verifications") return json(await verificationQueue(db, user), 200, origin);
+      if (request.method === "GET" && path === "/v1/admin/verifications") return json(await verificationQueue(db, user, env), 200, origin);
       params = match(path, "/v1/admin/verifications/:id");
       if (request.method === "POST" && params) return json(await decideVerification(db, user, params.id, await readJson(request)), 200, origin);
       if (request.method === "GET" && path === "/v1/admin/insights") return json(await insights(db, user), 200, origin);
-      if (request.method === "GET" && path === "/v1/admin/operations") return json(await operationsHealth(db, user), 200, origin);
+      if (request.method === "GET" && path === "/v1/admin/liquidity") return json(await liquidity(db, user), 200, origin);
+      if (request.method === "GET" && path === "/v1/admin/operations") return json(await operationsHealth(db, user, env), 200, origin);
       if (request.method === "GET" && path === "/v1/admin/operations/events") {
         return json(await operationsEvents(db, user, url.searchParams.get("limit")), 200, origin);
       }
@@ -310,5 +337,11 @@ export default {
       if (error instanceof HttpError) return json({ error: error.message }, error.status, origin);
       return json({ error: "The database did not accept that request." }, 500, origin);
     }
+  },
+
+  async scheduled(_event, env, ctx) {
+    const db = env.DB;
+    ctx.waitUntil(purgeExpiredIdentityFiles(db, env));
+    ctx.waitUntil(reconcilePending(db, env, { apply: env.ALLOW_PAYMENT_RECONCILIATION === "true" }));
   },
 };

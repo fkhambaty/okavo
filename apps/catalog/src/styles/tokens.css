@@ -1,0 +1,210 @@
+/* Okavo design system
+   Warm editorial paper, ink, and one amber signal.
+   No generic SaaS blue, no gradient washes, no decorative glow. */
+
+:root {
+  /* Ink and paper */
+  --ink: #0c0d10;
+  --ink-2: #1b1e24;
+  --ink-3: #14161b;
+  --body: #3d4149;
+  --muted: #6f6b62;
+  --faint: #9a958a;
+  --paper: #fbfaf7;
+  --bg: #f4f2ed;
+  --surface: #ffffff;
+  --line: #e5e1d8;
+  --line-2: #efece5;
+  --line-strong: #cfc9bc;
+
+  /* Signal */
+  --accent: #e8973a;
+  --accent-deep: #c87c1f;
+  --accent-soft: #fbeedc;
+  --accent-ink: #7a4c08;
+  --accent-fill: rgba(232, 151, 58, 0.16);
+  --accent-fill-strong: rgba(232, 151, 58, 0.18);
+
+  /* Status */
+  --lock: #1b7a5a;
+  --lock-soft: #e3f1eb;
+  --lock-bright: #58d2a8;
+  --lock-fill: rgba(27, 122, 90, 0.26);
+  --warn: #8a5b00;
+  --warn-soft: #fbeedc;
+  --warn-line: #f0dcb4;
+  --danger: #b3392b;
+  --danger-soft: #fbeae7;
+  --danger-line: #f0cdc7;
+  --danger-bright: #ff9083;
+  --danger-fill: rgba(179, 57, 43, 0.22);
+  --live: #3ecf8e;
+
+  /* Type set on ink (hero, sidebar, contract head) */
+  --on-ink: var(--paper);
+  --on-ink-strong: #e6e2d9;
+  --on-ink-body: #cfcbc2;
+  --on-ink-muted: #a8a49b;
+  --on-ink-faint: #8e8a81;
+  --on-ink-line: rgba(251, 250, 247, 0.12);
+  --on-ink-stroke: rgba(251, 250, 247, 0.24);
+  --on-ink-line-soft: rgba(251, 250, 247, 0.1);
+  --on-ink-line-faint: rgba(251, 250, 247, 0.08);
+  --on-ink-fill: rgba(251, 250, 247, 0.06);
+
+  /* Semantic aliases — components should prefer these */
+  --text: var(--ink);
+  --text-body: var(--body);
+  --text-muted: var(--muted);
+  --text-faint: var(--faint);
+  --border: var(--line);
+  --border-subtle: var(--line-2);
+  --border-strong: var(--line-strong);
+  --focus: var(--accent-deep);
+  --focus-ring: 0 0 0 3px var(--accent-soft);
+
+  /* Type */
+  --display: "Archivo", "Inter", system-ui, sans-serif;
+  --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-md: 1rem;
+  --leading-tight: 1.12;
+  --leading: 1.55;
+  --tracking-tight: -0.03em;
+  --tracking-display: -0.04em;
+  --tracking-label: 0.06em;
+
+  /* Space */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+
+  /* Shape */
+  --radius-sm: 8px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+
+  /* Motion — short, and only where it explains a change */
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --dur: 160ms;
+  --dur-slow: 280ms;
+
+  /* Layout */
+  --max: 1240px;
+  --sidebar: 252px;
+  --topbar: 64px;
+  --measure: 42rem;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  color-scheme: light;
+  scroll-behavior: smooth;
+  height: 100%;
+  /* Clip sideways scroll on the document, not on body. overflow-x:clip on
+     body makes the other axis a scrollport and cuts off position:fixed
+     drawers, backdrops, and dialogs. */
+  overflow-x: clip;
+  overflow-y: auto;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+  line-height: var(--leading);
+  overflow: visible;
+  width: 100%;
+}
+
+body.scroll-lock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  width: 100%;
+}
+
+html:has(body.scroll-lock) {
+  overflow: hidden;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button,
+a,
+input,
+select,
+textarea,
+label {
+  touch-action: manipulation;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+  text-wrap: balance;
+  line-height: var(--leading-tight);
+}
+
+p {
+  margin: 0;
+}
+
+.wrap {
+  width: min(100% - 2.5rem, var(--max));
+  margin-inline: auto;
+}
+

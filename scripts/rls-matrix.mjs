@@ -23,6 +23,11 @@ import {
   serviceHeaders,
 } from "./lib/okavo-env.mjs";
 
+console.error(
+  "npm run rls targeted Supabase row-level security and is retired. Authorization is enforced in the Worker. See cloudflare/worker/test/marketplace.integration.test.mjs.",
+);
+process.exit(1);
+
 const TEST_PASSWORD = "123456789";
 
 const ACCOUNTS = {

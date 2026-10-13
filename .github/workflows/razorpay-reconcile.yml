@@ -1,8 +1,7 @@
 name: Razorpay reconcile
 
-# Report-only drift check between pending Okavo payments and Razorpay.
-# Safe by default: the edge function only applies settlements when
-# ALLOW_PAYMENT_RECONCILIATION=true is set on the function secrets.
+# Report-only unless the Worker variable ALLOW_PAYMENT_RECONCILIATION is "true".
+# This job asks for a report. It does not send apply:true, so it cannot settle.
 
 on:
   schedule:
@@ -15,32 +14,36 @@ concurrency:
 
 jobs:
   reconcile:
-    name: Run reconcile (report mode)
+    name: Report pending payments
     runs-on: ubuntu-latest
     steps:
-      - name: Detect secrets
+      - name: Require the ops secret
         id: secrets
+        env:
+          OPS_CRON_SECRET: ${{ secrets.OPS_CRON_SECRET }}
         run: |
-          echo "configured=false" >> "$GITHUB_OUTPUT"
-          echo "Supabase reconcile was retired on 13 October 2026. The Worker does not settle payments from this job."
+          if [ -z "$OPS_CRON_SECRET" ]; then
+            echo "::error::OPS_CRON_SECRET is not set. Pending payments are not being reported from GitHub."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          echo "configured=true" >> "$GITHUB_OUTPUT"
 
-      - name: Invoke razorpay-reconcile
+      - name: Invoke Worker reconcile
         if: steps.secrets.outputs.configured == 'true'
         env:
-          PROD_SUPABASE_URL: ${{ secrets.PROD_SUPABASE_URL }}
-          RAZORPAY_RECONCILE_SECRET: ${{ secrets.RAZORPAY_RECONCILE_SECRET }}
+          OPS_CRON_SECRET: ${{ secrets.OPS_CRON_SECRET }}
         run: |
           set -euo pipefail
-          url="${PROD_SUPABASE_URL%/}/functions/v1/razorpay-reconcile"
           body="$(mktemp)"
-          status="$(curl -sS -o "$body" -w '%{http_code}' -X POST "$url" \
-            -H "x-okavo-notify: ${RAZORPAY_RECONCILE_SECRET}" \
+          status="$(curl -sS -o "$body" -w '%{http_code}' -X POST \
+            "https://okavo-api.fkhambaty.workers.dev/v1/ops/reconcile" \
+            -H "x-okavo-ops: ${OPS_CRON_SECRET}" \
             -H "content-type: application/json" \
-            --data '{}')"
+            --data '{"apply":false}')"
           echo "HTTP $status"
-          cat "$body"
-          echo
+          node -e 'const fs=require("fs"); const data=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); const safe={pending:data.pending,settled:data.settled,unchanged:data.unchanged,mismatched:data.mismatched,apply:data.apply,charge:data.charge,checkout:data.checkout,reason:data.reason,error:data.error}; if(safe.charge!==false){console.error("reconcile reported a charge"); process.exit(1);} console.log(JSON.stringify(safe));' "$body"
           if [ "$status" != "200" ]; then
-            echo "::error::razorpay-reconcile returned $status"
+            echo "::error::reconcile returned $status"
             exit 1
           fi

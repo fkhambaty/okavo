@@ -72,6 +72,35 @@ export default function AdminOperations() {
               </div>
             </div>
 
+            <div className="card" style={{ marginBottom: "1rem" }}>
+              <div className="card-head">
+                <div>
+                  <h2>Configuration</h2>
+                  <p className="hint">
+                    Flags only. Secret values are not shown. Payment records are attestations, not escrow.
+                  </p>
+                </div>
+              </div>
+              <div className="stat-row">
+                <div className="stat">
+                  <span>Analytics ingest</span>
+                  <strong>{health.analyticsIngestConfigured ? "Configured" : "Missing"}</strong>
+                </div>
+                <div className="stat">
+                  <span>Signup mail</span>
+                  <strong>{health.mailConfigured ? "Configured" : "Missing"}</strong>
+                </div>
+                <div className="stat">
+                  <span>Checkout</span>
+                  <strong>{health.checkout}</strong>
+                </div>
+                <div className="stat">
+                  <span>File storage</span>
+                  <strong>{health.r2Enabled ? "R2" : "D1"}</strong>
+                </div>
+              </div>
+            </div>
+
             <div className="card">
               <div className="card-head">
                 <div>

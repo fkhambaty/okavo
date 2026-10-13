@@ -81,7 +81,23 @@ export function trackPageView(profileId: string | null) {
     headers: { "Content-Type": "application/json" },
     body,
     keepalive: true,
-  }).catch(() => {
-    // Analytics must never surface an error to a visitor.
-  });
+  })
+    .then(async (response) => {
+      if (response.status !== 502 && response.status !== 503) return;
+      let detail = "";
+      try {
+        const payload = (await response.json()) as { error?: string; missing?: string[] };
+        if (payload.error === "analytics_misconfigured") {
+          detail = ` Missing: ${(payload.missing ?? []).join(", ")}.`;
+        } else if (payload.error) {
+          detail = ` ${payload.error}.`;
+        }
+      } catch {
+        detail = "";
+      }
+      console.warn(`Okavo analytics is misconfigured.${detail}`);
+    })
+    .catch(() => {
+      // A network failure is not a configuration claim.
+    });
 }

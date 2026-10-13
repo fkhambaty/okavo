@@ -21,6 +21,11 @@ import {
   resolveTarget,
 } from "./lib/okavo-env.mjs";
 
+console.error(
+  "seed:test is retired. It used to insert sample buyers, developers, and requirements into Supabase. Do not invent that activity. Post a real requirement yourself. See docs/FOUNDER_SEEDING.md.",
+);
+process.exit(1);
+
 const target = resolveTarget();
 assertSafeForDestructiveSeed(target);
 

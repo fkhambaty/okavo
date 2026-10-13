@@ -235,6 +235,42 @@ export function examHeuristicScore({ githubOk, liveOk, repoOk, hostedOk, duplica
   return { overall, checks };
 }
 
+/** A secret is configured only when it is present and long enough to be a real value. The value itself is never returned. */
+export function secretConfigured(value) {
+  return typeof value === "string" && value.length >= 16;
+}
+
+export function analyticsIngestStatus(env, header) {
+  if (!secretConfigured(env?.ANALYTICS_INGEST_SECRET)) return "misconfigured";
+  if (!timingSafeEqual(String(header || ""), env.ANALYTICS_INGEST_SECRET)) return "rejected";
+  return "ok";
+}
+
+export function opsAuthStatus(env, header) {
+  if (!secretConfigured(env?.OPS_CRON_SECRET)) return "misconfigured";
+  if (!timingSafeEqual(String(header || ""), env.OPS_CRON_SECRET)) return "rejected";
+  return "ok";
+}
+
+/** R2 is live only when the Worker binding can actually store an object. */
+export function r2Enabled(env) {
+  return typeof env?.FILES?.put === "function" && typeof env?.FILES?.get === "function";
+}
+
+export function storageBackend(env) {
+  return r2Enabled(env) ? "r2" : "d1";
+}
+
+export function mailConfigured(env) {
+  return secretConfigured(env?.RESEND_API_KEY) && typeof env?.MAIL_FROM === "string" && env.MAIL_FROM.includes("@");
+}
+
+export const REVIEW_SLA = {
+  identity: "A person reviews government ID. Identity is never approved by a score.",
+  exam: "A score of 70 or higher may auto-approve 48 hours after submission unless an admin paused auto-approval or placed a hold. Any lower or missing score waits for a person. Duplicate repositories are flagged for that person and are not rejected automatically.",
+  identityFileRetentionDays: 90,
+};
+
 export function publicHttpsUrl(raw) {
   let url;
   try {

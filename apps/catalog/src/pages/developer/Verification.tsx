@@ -4,6 +4,7 @@ import * as api from "../../lib/api";
 import { collectFee } from "../../lib/checkout";
 import * as examApi from "../../lib/exam";
 import {
+  EXAM_ADMIN_SLA_HOURS,
   EXAM_AUTO_APPROVE_MIN_SCORE,
   EXAM_DAILY_START_CAP,
   EXAM_WINDOW_HOURS,
@@ -123,11 +124,18 @@ export default function Verification() {
       <header className="topbar">
         <h1>Verification and membership</h1>
         <div className="topbar-actions">
-          {developerAccount.membershipPaid ? (
-            <span className="badge badge-lock">Bidding active</span>
-          ) : (
-            <span className="badge badge-draft">Bidding locked</span>
-          )}
+          <div className="badge-row">
+            {developerAccount.membershipPaid ? (
+              <span className="badge badge-lock">Bidding active</span>
+            ) : (
+              <span className="badge badge-draft">Bidding locked</span>
+            )}
+            <span className="badge-explain">
+              {developerAccount.membershipPaid
+                ? "The database allows a bid only when identity, the exam, and this membership are all approved."
+                : "The bid route refuses this account until the membership payment is recorded."}
+            </span>
+          </div>
         </div>
       </header>
 
@@ -221,17 +229,22 @@ export default function Verification() {
           <div className="card">
             <div className="card-head">
               <h2>Government ID</h2>
-              <span
-                className={
-                  identityApproved
-                    ? "badge badge-lock"
-                    : identityStatus === "rejected"
-                      ? "badge badge-danger"
-                      : "badge badge-draft"
-                }
-              >
-                {IDENTITY_LABEL[identityStatus] ?? identityStatus}
-              </span>
+              <div className="badge-row">
+                <span
+                  className={
+                    identityApproved
+                      ? "badge badge-lock"
+                      : identityStatus === "rejected"
+                        ? "badge badge-danger"
+                        : "badge badge-draft"
+                  }
+                >
+                  {IDENTITY_LABEL[identityStatus] ?? identityStatus}
+                </span>
+                <span className="badge-explain">
+                  A person reviews the document. Identity is never approved by a score. The file is deleted 90 days after that decision.
+                </span>
+              </div>
             </div>
             <div style={{ padding: "1.25rem" }}>
               {identityApproved ? (
@@ -249,8 +262,8 @@ export default function Verification() {
                   <div className="verify-item">
                     <span className="verify-icon pending">•</span>
                     <div>
-                      <strong>Annual re-verification</strong>
-                      <p>You will be reminded 30 days before it is due.</p>
+                      <strong>File retention</strong>
+                      <p>The document and selfie are deleted 90 days after this decision. Okavo does not send an annual reminder.</p>
                     </div>
                   </div>
                 </>
@@ -269,13 +282,18 @@ export default function Verification() {
           <div className="card">
             <div className="card-head">
               <h2>Build exam (required to bid)</h2>
-              {developerAccount.interviewStatus === "approved" ? (
-                <span className="badge badge-lock">Approved</span>
-              ) : (
-                <span className="badge badge-draft">
-                  {exam?.status?.replace(/_/g, " ") ?? "Not started"}
+              <div className="badge-row">
+                {developerAccount.interviewStatus === "approved" ? (
+                  <span className="badge badge-lock">Approved</span>
+                ) : (
+                  <span className="badge badge-draft">
+                    {exam?.status?.replace(/_/g, " ") ?? "Not started"}
+                  </span>
+                )}
+                <span className="badge-explain">
+                  Score {EXAM_AUTO_APPROVE_MIN_SCORE}+ may auto-approve after {EXAM_ADMIN_SLA_HOURS} hours unless paused or held. A lower score waits for a person.
                 </span>
-              )}
+              </div>
             </div>
             <div style={{ padding: "1.25rem" }}>
               <div className="callout callout-warn" style={{ marginBottom: "1rem" }}>

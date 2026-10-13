@@ -1,7 +1,18 @@
 import { consumeRateLimit } from "./auth.js";
 import { deleteFile, purgeExpiredIdentityFiles, setFileExpiry, storePrivateFile } from "./files.js";
 import { HttpError, clampText } from "./http.js";
-import { IDENTITY_RETENTION_MS, lockReference, nowIso, sha256, timingSafeEqual } from "./pure.js";
+import {
+  IDENTITY_RETENTION_MS,
+  REVIEW_SLA,
+  analyticsIngestStatus,
+  checkoutMode,
+  lockReference,
+  mailConfigured,
+  nowIso,
+  secretConfigured,
+  sha256,
+  storageBackend,
+} from "./pure.js";
 
 function requireUser(user) {
   if (!user?.email_verified_at) throw new HttpError(401, "Sign in again.");
@@ -632,7 +643,7 @@ export async function acceptMilestone(db, user, milestoneId) {
   return { ok: true };
 }
 
-export async function fundMilestone(db, user, milestoneId, body) {
+export async function fundMilestone(db, user, milestoneId, body, env) {
   requireUser(user);
   const milestone = await db.prepare("SELECT * FROM milestones WHERE id = ?").bind(milestoneId).first();
   if (!milestone) throw new HttpError(404, "Milestone not found");
@@ -656,7 +667,7 @@ export async function fundMilestone(db, user, milestoneId, body) {
       purpose: "payment_proof",
       mime: body.proof.mime,
       data: body.proof.data,
-    });
+    }, env);
     proofId = stored.id;
   }
   const now = nowIso();
@@ -684,7 +695,7 @@ export async function fundMilestone(db, user, milestoneId, body) {
       )
       .run();
   } catch (error) {
-    if (proofId) await deleteFile(db, proofId);
+    if (proofId) await deleteFile(db, proofId, { env, reason: "payment_proof_replaced", actorId: user.id });
     throw error;
   }
   await db
@@ -969,7 +980,7 @@ export async function submitInterview(db, user) {
   return { ok: true };
 }
 
-export async function submitIdentity(db, user, body) {
+export async function submitIdentity(db, user, body, env) {
   requireUser(user);
   if (user.role !== "developer") throw new HttpError(403, "Only a developer can submit identity documents");
   const allowed = await consumeRateLimit(db, await sha256(`identity:${user.id}`), 8, 3600);
@@ -987,7 +998,7 @@ export async function submitIdentity(db, user, body) {
     purpose: "identity_document",
     mime: body.document.mime,
     data: body.document.data,
-  });
+  }, env);
   let selfieId = null;
   try {
     if (body?.selfie?.data) {
@@ -996,11 +1007,11 @@ export async function submitIdentity(db, user, body) {
         purpose: "identity_selfie",
         mime: body.selfie.mime,
         data: body.selfie.data,
-      });
+      }, env);
       selfieId = selfie.id;
     }
   } catch (error) {
-    await deleteFile(db, document.id);
+    await deleteFile(db, document.id, { env, reason: "identity_upload_failed", actorId: user.id });
     throw error;
   }
   const previous = await db
@@ -1008,8 +1019,8 @@ export async function submitIdentity(db, user, body) {
     .bind(user.id)
     .all();
   for (const row of previous.results || []) {
-    await deleteFile(db, row.document_storage_path);
-    await deleteFile(db, row.selfie_storage_path);
+    await deleteFile(db, row.document_storage_path, { env, reason: "identity_replaced", actorId: user.id });
+    await deleteFile(db, row.selfie_storage_path, { env, reason: "identity_replaced", actorId: user.id });
   }
   const now = nowIso();
   const id = crypto.randomUUID();
@@ -1033,10 +1044,10 @@ export async function submitIdentity(db, user, body) {
   return { id };
 }
 
-export async function verificationQueue(db, user) {
+export async function verificationQueue(db, user, env) {
   requireUser(user);
   if (!isAdmin(user)) throw new HttpError(403, "Admin only");
-  await purgeExpiredIdentityFiles(db);
+  await purgeExpiredIdentityFiles(db, env);
   const result = await db
     .prepare(
       `SELECT v.*, p.full_name, p.country_code
@@ -1101,12 +1112,73 @@ export async function insights(db, user) {
     lockedProjects: await count("SELECT COUNT(*) AS count FROM projects WHERE stage != 'drafting'"),
     bids: await count("SELECT COUNT(*) AS count FROM bids"),
     feesCollectedCents,
-    escrowCents,
+    escrowCents: 0,
+    attestedInProgressCents: escrowCents,
+    paymentModel: "attestation",
     pendingReviews: await count("SELECT COUNT(*) AS count FROM identity_verifications WHERE status = 'submitted'"),
   };
 }
 
-export async function operationsHealth(db, user) {
+export async function liquidity(db, user) {
+  requireUser(user);
+  if (!isAdmin(user)) throw new HttpError(403, "Admin only");
+  const count = async (sql) => Number((await db.prepare(sql).first())?.count || 0);
+  const verifiedBuyers = await count(
+    `SELECT COUNT(*) AS count FROM profiles p
+       JOIN buyer_profiles b ON b.profile_id = p.id
+      WHERE p.email_verified_at IS NOT NULL`,
+  );
+  const published = await count("SELECT COUNT(*) AS count FROM projects WHERE published_at IS NOT NULL");
+  const locked = await count(
+    "SELECT COUNT(*) AS count FROM projects WHERE stage IN ('locked', 'hired', 'in_delivery', 'delivered', 'closed')",
+  );
+  const verifiedDevelopers = await count(
+    "SELECT COUNT(*) AS count FROM developer_profiles WHERE identity_status = 'approved' AND interview_status = 'approved'",
+  );
+  const bids = await count("SELECT COUNT(*) AS count FROM bids");
+  const hired = await count(
+    "SELECT COUNT(*) AS count FROM projects WHERE stage IN ('hired', 'in_delivery', 'delivered', 'closed')",
+  );
+  const disputed = await count("SELECT COUNT(*) AS count FROM contracts WHERE status = 'disputed'");
+  const withDeveloper = await count("SELECT COUNT(*) AS count FROM contracts WHERE developer_id IS NOT NULL");
+  const timing = await db
+    .prepare(
+      `SELECT AVG((julianday(b.first_bid) - julianday(p.published_at)) * 24) AS hours,
+              COUNT(*) AS samples
+         FROM projects p
+         JOIN (
+           SELECT project_id, MIN(created_at) AS first_bid
+             FROM bids
+            GROUP BY project_id
+         ) b ON b.project_id = p.id
+        WHERE p.published_at IS NOT NULL AND b.first_bid >= p.published_at`,
+    )
+    .first();
+  const samples = Number(timing?.samples || 0);
+  return {
+    verifiedBuyers,
+    publishedRequirements: published,
+    lockedRequirements: locked,
+    verifiedDevelopers,
+    timeToFirstBidHours: samples ? Number(timing.hours) : null,
+    timeToFirstBidSamples: samples,
+    bidsPerRequirement: published ? bids / published : null,
+    bidCount: bids,
+    hireConversion: locked ? hired / locked : null,
+    hiredCount: hired,
+    disputeRate: withDeveloper ? disputed / withDeveloper : null,
+    disputedContracts: disputed,
+    contractsWithDeveloper: withDeveloper,
+    reviewSla: REVIEW_SLA,
+    founderSeeds: {
+      note: "Live rows only. Okavo does not insert sample requirements, developers, testimonials, or activity.",
+      publishedRequirements: published,
+      verifiedDevelopers,
+    },
+  };
+}
+
+export async function operationsHealth(db, user, env) {
   requireUser(user);
   if (!isAdmin(user)) throw new HttpError(403, "Admin only");
   const count = async (sql) => Number((await db.prepare(sql).first())?.count || 0);
@@ -1128,13 +1200,19 @@ export async function operationsHealth(db, user) {
     .bind(nowIso())
     .first();
   const dueBefore = Number(dueRow?.count || 0);
-  await purgeExpiredIdentityFiles(db);
+  await purgeExpiredIdentityFiles(db, env);
   return {
     pending_payments: Number(pending?.count || 0),
     failed_events_24h: Number(failed?.count || 0),
     open_critical_events: await count("SELECT COUNT(*) AS count FROM ops_events WHERE severity = 'critical' AND resolved_at IS NULL"),
     identity_documents_due: dueBefore,
     checked_at: nowIso(),
+    analytics_ingest_configured: secretConfigured(env?.ANALYTICS_INGEST_SECRET),
+    mail_configured: mailConfigured(env),
+    checkout: checkoutMode(env),
+    storage: storageBackend(env),
+    r2_enabled: storageBackend(env) === "r2",
+    payment_model: "attestation",
   };
 }
 
@@ -1260,10 +1338,9 @@ export async function analyticsDaily(db, user, days) {
 }
 
 export async function collectVisit(db, env, request, body) {
-  const secret = request.headers.get("x-okavo-ingest") || "";
-  if (!env.ANALYTICS_INGEST_SECRET || !timingSafeEqual(secret, env.ANALYTICS_INGEST_SECRET)) {
-    throw new HttpError(401, "Unauthorized");
-  }
+  const ingest = analyticsIngestStatus(env, request.headers.get("x-okavo-ingest") || "");
+  if (ingest === "misconfigured") throw new HttpError(503, "Analytics ingest is not configured");
+  if (ingest !== "ok") throw new HttpError(401, "Unauthorized");
   const visitor = clampText(body?.visitor_id, 80);
   const path = clampText(body?.path, 300);
   if (!visitor || !path) return { ok: true };

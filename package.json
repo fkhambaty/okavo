@@ -11,11 +11,11 @@
     "lint": "npm run lint -w apps/catalog",
     "typecheck": "npm exec -w apps/catalog -- tsc -b --force",
     "okavo": "node scripts/okavo.mjs",
-    "smoke": "node scripts/smoke-test.mjs",
+    "smoke": "node scripts/production-smoke.mjs",
     "rls": "node scripts/rls-matrix.mjs",
     "seed:accounts": "node scripts/seed-accounts.mjs",
     "seed:test": "node scripts/seed-test-data.mjs",
-    "test": "node --test cloudflare/worker/test/pure.test.mjs",
+    "test": "node --test cloudflare/worker/test/*.test.mjs",
     "responsive": "node scripts/responsive-audit.mjs"
   },
   "devDependencies": {

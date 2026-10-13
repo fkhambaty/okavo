@@ -17,9 +17,9 @@ and Cloudflare Pages.
 | Responsive | `docs/responsive.md`. `npm run responsive` after a build that includes `VITE_OKAVO_API_URL`. |
 | API | Worker `okavo-api` at https://okavo-api.fkhambaty.workers.dev |
 | Database | D1 `okavo` (`3d3afb8e-1749-4c70-8001-e115504e3b03`) |
-| Schema | `cloudflare/d1/0001_okavo.sql`, then `cloudflare/d1/0002_files_exams_checkout.sql` |
+| Schema | `cloudflare/d1/0001_okavo.sql`, then `0002_files_exams_checkout.sql`, then `0003_storage_audit.sql` |
 | Checkout | `CHECKOUT_MODE=hosted` in `cloudflare/worker/wrangler.toml`. Payment Links, merchant text `FKTech`. Set the var to `modal` and `npx wrangler deploy` only after Razorpay approves okavo.org. |
-| Files | D1 `files` + `file_chunks`. Not R2. 5 MB, jpeg/png/webp/pdf, private `GET /v1/files/:id`. Identity files are deleted 90 days after the admin decision. |
+| Files | D1 `files` + `file_chunks` until R2 is enabled. 5 MB, jpeg/png/webp/pdf, private `GET /v1/files/:id`. Identity files are deleted 90 days after the admin decision, and each deletion is written to `deletion_audit`. Do not claim R2 is live. |
 | Exams | Worker routes under `/v1/exams`. Local heuristic score, no LLM key. |
 | Admins | `fakhruddinkhambaty@gmail.com` and `fktiindia@gmail.com` become `admin` on signup, verify, and login. Do not insert a password for them. |
 | Email | Resend domain `okavo.org` verified on 13 Oct 2026: DKIM TXT, SPF MX, SPF TXT, and the tracking CNAME. Signup mail from `support@okavo.org` can send. |
@@ -65,29 +65,29 @@ RLS/smoke job skips.
 ### Scheduled identity-retention sweep
 
 [`.github/workflows/identity-sweep.yml`](../.github/workflows/identity-sweep.yml)
-runs weekly (and on demand) to purge identity documents past their 90-day
-deadline and to complete account-erasure requests. It calls the
-`identity-retention-sweep` edge function, which is `verify_jwt = false` and
-guards itself with a shared secret, so the job never handles a Supabase key.
+runs weekly and calls `POST /v1/ops/retention` on the Worker. The Worker cron
+does the same purge. The GitHub job fails visibly when `OPS_CRON_SECRET` is
+missing. It does not print the secret.
 
 | Secret | Purpose |
 |--------|---------|
-| `PROD_SUPABASE_URL` | Base URL of the project to sweep (e.g. `https://fzgnzaflvbimbiseqnrz.supabase.co`) |
-| `IDENTITY_SWEEP_SECRET` | Must match the function's `IDENTITY_SWEEP_SECRET`; sent as the `x-okavo-notify` header |
+| `OPS_CRON_SECRET` | Must match the Worker secret `OPS_CRON_SECRET`. Sent as `x-okavo-ops`. Never print it. |
 
-When either secret is absent the workflow skips instead of failing.
+When the secret is absent the workflow fails instead of pretending the sweep ran.
 
 ### Scheduled Razorpay reconcile (report mode)
 
 [`.github/workflows/razorpay-reconcile.yml`](../.github/workflows/razorpay-reconcile.yml)
-runs daily and on demand. It calls `razorpay-reconcile` with
-`RAZORPAY_RECONCILE_SECRET`. The function stays report-only unless
-`ALLOW_PAYMENT_RECONCILIATION=true` is set on the Supabase function secrets.
+runs daily and posts `{"apply":false}` to `POST /v1/ops/reconcile`. It cannot settle a payment. Settlement from the Worker cron stays off unless `ALLOW_PAYMENT_RECONCILIATION` is `"true"`.
 
 | Secret | Purpose |
 |--------|---------|
-| `PROD_SUPABASE_URL` | Same production URL as the identity sweep |
-| `RAZORPAY_RECONCILE_SECRET` | Must match the function secret (`x-okavo-notify`) |
+| `OPS_CRON_SECRET` | Same Worker secret as the retention job |
+
+### Weekly production smoke
+
+[`.github/workflows/production-smoke.yml`](../.github/workflows/production-smoke.yml)
+checks the homepage, Worker health, signup-mail configuration flag, the dummy login, a payment quote that does not charge, and phone/desktop overflow. It does not create an account.
 
 ## Hardening rollout (staging → production)
 

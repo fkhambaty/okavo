@@ -14,6 +14,24 @@ const BUILDS = [
   "Whatever you can describe",
 ];
 
+const SHOTS = [
+  {
+    src: "/product/signin.png",
+    title: "Sign-in",
+    caption: "The live sign-in screen. A new account waits for an email code before it can enter.",
+  },
+  {
+    src: "/product/how-it-works.png",
+    title: "The four steps",
+    caption: "The public how-it-works page. Scope is written down before a developer can bid.",
+  },
+  {
+    src: "/product/security.png",
+    title: "Payment attestation",
+    caption: "The security page. Buyers pay developers themselves. Okavo records that payment. It does not hold it.",
+  },
+];
+
 const BUYERS = [
   "A school principal",
   "A bakery with two counters",
@@ -27,12 +45,12 @@ const BUYERS = [
 export default function Landing() {
   return (
     <MarketingLayout>
-      <section className="hero">
+      <section className="hero hero-ledger">
         <div className="wrap">
           <div className="hero-grid">
             <div>
               <span className="eyebrow">Websites · Apps · Software</span>
-              <h1>Where the world comes to have software built.</h1>
+              <h1 className="ledger-title">Where the world comes to have software built.</h1>
               <p className="hero-lead">
                 Describe what you need in your own words. Okavo turns it into a
                 signed agreement, then verified developers build exactly that.
@@ -50,13 +68,13 @@ export default function Landing() {
             </div>
 
             <div>
-              <div className="lock-card">
+              <div className="lock-card lock-card-physical">
                 <div className="lock-card-head">
                   <div>
                     <strong>Your agreement</strong>
                     <span>Settled before anyone starts building</span>
                   </div>
-                  <span className="lock-pill">Agreed</span>
+                  <span className="lock-stamp">Not escrow</span>
                 </div>
 
                 <div className="lock-card-body">
@@ -152,38 +170,38 @@ export default function Landing() {
               a written agreement, signed by both sides, before work begins.
             </p>
           </div>
-          <div className="steps">
-            <div className="step">
+          <ol className="ink-timeline">
+            <li>
               <div className="step-num">01</div>
               <h4>Describe the outcome</h4>
               <p>
                 Plain language. No specification, no stack decisions, no jargon.
               </p>
-            </div>
-            <div className="step">
+            </li>
+            <li>
               <div className="step-num">02</div>
               <h4>Review what it means</h4>
               <p>
                 We turn your answers into a precise list of what is in and what
                 is out.
               </p>
-            </div>
-            <div className="step">
+            </li>
+            <li>
               <div className="step-num">03</div>
               <h4>Sign the lock</h4>
               <p>
                 Scope, build budget and monthly running cost are frozen and
                 signed.
               </p>
-            </div>
-            <div className="step">
+            </li>
+            <li>
               <div className="step-num">04</div>
               <h4>Developers compete</h4>
               <p>
                 Verified engineers bid on identical scope. No moving targets.
               </p>
-            </div>
-          </div>
+            </li>
+          </ol>
         </div>
       </section>
 
@@ -193,8 +211,9 @@ export default function Landing() {
             <h2>The same four steps, whoever you are</h2>
             <p>
               Okavo does not have a small-business version and an enterprise
-              version. Everyone gets the lock and the guarantee. Okavo-held
-              escrow for build payments is next.
+              version. Everyone gets the same lock. Build money is a payment
+              attestation: you pay the developer yourself, then record it here.
+              Okavo does not hold that money in escrow.
             </p>
           </div>
           <div className="buyers-strip">
@@ -253,7 +272,7 @@ export default function Landing() {
             <ul>
               <li>
                 <span className="dot" />
-                Identity-verified with government ID before bidding (recorded build interview is next)
+                Government ID and a timed build exam, both reviewed before a bid is accepted
               </li>
               <li>
                 <span className="dot" />
@@ -303,6 +322,29 @@ export default function Landing() {
             <Link className="btn btn-secondary" to="/guarantee">
               How each promise is enforced
             </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="section-tight" id="product">
+        <div className="wrap">
+          <div className="section-head">
+            <h2>The product, as it is</h2>
+            <p className="attestation-note">
+              These are screenshots of the live Okavo pages. They are not mockups
+              and they do not show other people’s projects.
+            </p>
+          </div>
+          <div className="product-shots">
+            {SHOTS.map((shot) => (
+              <figure className="product-shot" key={shot.src}>
+                <img src={shot.src} alt={shot.caption} />
+                <figcaption>
+                  <strong>{shot.title}</strong>
+                  {shot.caption}
+                </figcaption>
+              </figure>
+            ))}
           </div>
         </div>
       </section>

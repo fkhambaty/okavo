@@ -12,22 +12,14 @@ import { isBackendConfigured as isSupabaseConfigured } from "../../lib/backend";
 import { errorMessage } from "../../lib/errors";
 import type { TrendPoint } from "../../lib/chartMath";
 
-const DEMO: api.PlatformInsights = {
-  buyers: 3,
-  developers: 5,
-  verifiedDevelopers: 4,
-  projects: 4,
-  lockedProjects: 3,
-  bids: 7,
-  feesCollectedCents: 4300,
-  escrowCents: 500000,
-  pendingReviews: 1,
-};
+function formatRatio(value: number | null, digits = 2): string {
+  if (value === null || Number.isNaN(value)) return "—";
+  return value.toFixed(digits);
+}
 
 export default function AdminHome() {
-  const [insights, setInsights] = useState<api.PlatformInsights | null>(
-    isSupabaseConfigured ? null : DEMO
-  );
+  const [insights, setInsights] = useState<api.PlatformInsights | null>(null);
+  const [liquidity, setLiquidity] = useState<api.LiquidityMetrics | null>(null);
   const [traffic, setTraffic] = useState<TrendPoint[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,6 +28,10 @@ export default function AdminHome() {
     api
       .fetchInsights()
       .then(setInsights)
+      .catch((cause) => setError(errorMessage(cause)));
+    api
+      .fetchLiquidity()
+      .then(setLiquidity)
       .catch((cause) => setError(errorMessage(cause)));
 
     api
@@ -107,9 +103,16 @@ export default function AdminHome() {
           </div>
         )}
 
-        {!insights ? (
+        {!isSupabaseConfigured && (
+          <div className="card empty">
+            <strong>No live counts in this build</strong>
+            The Worker URL is not configured, so this page does not estimate buyers, bids, or fees.
+          </div>
+        )}
+
+        {!insights && isSupabaseConfigured ? (
           <div className="card empty">Loading platform data…</div>
-        ) : (
+        ) : insights ? (
           <>
             <div className="stat-row">
               <div className="stat">
@@ -144,8 +147,9 @@ export default function AdminHome() {
                 <strong>{insights.bids}</strong>
               </div>
               <div className="stat">
-                <span>Milestone value in delivery</span>
-                <strong>{money(insights.escrowCents / 100)}</strong>
+                <span>Recorded milestone amounts</span>
+                <strong>{money((insights.attestedInProgressCents ?? 0) / 100)}</strong>
+                <span>Okavo does not hold this money</span>
               </div>
             </div>
 
@@ -209,6 +213,85 @@ export default function AdminHome() {
               </ChartCard>
             </div>
 
+            {liquidity && (
+              <div className="card" style={{ marginBottom: "1rem" }}>
+                <div className="card-head">
+                  <div>
+                    <h2>Marketplace liquidity</h2>
+                    <p className="hint">{liquidity.founderSeeds.note}</p>
+                  </div>
+                </div>
+                <div className="stat-row">
+                  <div className="stat">
+                    <span>Verified buyers</span>
+                    <strong>{liquidity.verifiedBuyers}</strong>
+                  </div>
+                  <div className="stat">
+                    <span>Published requirements</span>
+                    <strong>{liquidity.publishedRequirements}</strong>
+                  </div>
+                  <div className="stat">
+                    <span>Locked requirements</span>
+                    <strong>{liquidity.lockedRequirements}</strong>
+                  </div>
+                  <div className="stat">
+                    <span>Verified developers</span>
+                    <strong>{liquidity.verifiedDevelopers}</strong>
+                  </div>
+                </div>
+                <div className="stat-row">
+                  <div className="stat">
+                    <span>Time to first bid</span>
+                    <strong>
+                      {liquidity.timeToFirstBidSamples
+                        ? `${formatRatio(liquidity.timeToFirstBidHours, 1)} h`
+                        : "—"}
+                    </strong>
+                    <span>
+                      {liquidity.timeToFirstBidSamples
+                        ? `${liquidity.timeToFirstBidSamples} requirement(s) with a bid`
+                        : "No bid has followed a published requirement"}
+                    </span>
+                  </div>
+                  <div className="stat">
+                    <span>Bids per requirement</span>
+                    <strong>{formatRatio(liquidity.bidsPerRequirement, 2)}</strong>
+                  </div>
+                  <div className="stat">
+                    <span>Hire conversion</span>
+                    <strong>
+                      {liquidity.hireConversion === null
+                        ? "—"
+                        : `${Math.round(liquidity.hireConversion * 100)}%`}
+                    </strong>
+                    <span>
+                      {liquidity.hiredCount} hired of {liquidity.lockedRequirements} locked
+                    </span>
+                  </div>
+                  <div className="stat">
+                    <span>Dispute rate</span>
+                    <strong>
+                      {liquidity.disputeRate === null
+                        ? "—"
+                        : `${Math.round(liquidity.disputeRate * 100)}%`}
+                    </strong>
+                    <span>
+                      {liquidity.contractsWithDeveloper
+                        ? `${liquidity.disputedContracts} of ${liquidity.contractsWithDeveloper} hired contracts`
+                        : "No hired contract yet"}
+                    </span>
+                  </div>
+                </div>
+                <div style={{ padding: "0 1.25rem 1.25rem" }}>
+                  <p className="hint">{liquidity.reviewSla.identity}</p>
+                  <p className="hint">{liquidity.reviewSla.exam}</p>
+                  <p className="hint">
+                    Identity files are deleted {liquidity.reviewSla.identityFileRetentionDays} days after the review decision.
+                  </p>
+                </div>
+              </div>
+            )}
+
             <ChartCard
               title="Site traffic — last 30 days"
               hint="Page views and unique visitors. Open Traffic for channels and geography."
@@ -228,7 +311,7 @@ export default function AdminHome() {
               />
             </ChartCard>
           </>
-        )}
+        ) : null}
       </div>
     </>
   );

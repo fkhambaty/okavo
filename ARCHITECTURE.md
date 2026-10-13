@@ -24,6 +24,14 @@ These routes stay unimplemented and return an error instead of invented data:
 
 Private files, build exams, owner admin promotion, and hosted checkout are live. See the sections below.
 
+Analytics collection returns HTTP 503 with `{ error: "analytics_misconfigured", missing: [...] }` when `OKAVO_API_URL` or `ANALYTICS_INGEST_SECRET` is absent. It does not return a silent 204 for that case. The response names the missing settings and does not include the secret. The Worker answers 503 when its own ingest secret is missing and 401 when the header does not match.
+
+R2 is not enabled (API error 10042). `cloudflare/d1/0003_storage_audit.sql` adds storage columns and a deletion audit. Uploads stay in D1 until a `FILES` binding exists. Health reports `storage: "d1"` and `r2Enabled: false` until then.
+
+`CHECKOUT_MODE` remains `hosted` until Razorpay approves okavo.org. `GET /v1/payments/quote` returns the server amount with `charge: false` and does not create a Razorpay order. Pending-payment reconciliation is report-only unless `ALLOW_PAYMENT_RECONCILIATION` is `"true"`.
+
+Founder requirements are not seeded by a script. `docs/FOUNDER_SEEDING.md` is the hand workflow. Counts of zero are the honest state.
+
 ## Private files
 
 Cloudflare R2 is not enabled on this account (API error 10042). Identity documents and milestone payment proofs are stored in D1, not in a public bucket.

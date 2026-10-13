@@ -943,11 +943,43 @@ export type PlatformInsights = {
   bids: number;
   feesCollectedCents: number;
   escrowCents: number;
+  attestedInProgressCents?: number;
+  paymentModel?: string;
   pendingReviews: number;
+};
+
+export type LiquidityMetrics = {
+  verifiedBuyers: number;
+  publishedRequirements: number;
+  lockedRequirements: number;
+  verifiedDevelopers: number;
+  timeToFirstBidHours: number | null;
+  timeToFirstBidSamples: number;
+  bidsPerRequirement: number | null;
+  bidCount: number;
+  hireConversion: number | null;
+  hiredCount: number;
+  disputeRate: number | null;
+  disputedContracts: number;
+  contractsWithDeveloper: number;
+  reviewSla: {
+    identity: string;
+    exam: string;
+    identityFileRetentionDays: number;
+  };
+  founderSeeds: {
+    note: string;
+    publishedRequirements: number;
+    verifiedDevelopers: number;
+  };
 };
 
 export async function fetchInsights(): Promise<PlatformInsights> {
   return backend<PlatformInsights>("/v1/admin/insights");
+}
+
+export async function fetchLiquidity(): Promise<LiquidityMetrics> {
+  return backend<LiquidityMetrics>("/v1/admin/liquidity");
 }
 
 export type AnalyticsOverview = {
@@ -1147,6 +1179,12 @@ export type OperationsHealth = {
   openCriticalEvents: number;
   identityDocumentsDue: number;
   checkedAt: string;
+  analyticsIngestConfigured: boolean;
+  mailConfigured: boolean;
+  checkout: string;
+  storage: string;
+  r2Enabled: boolean;
+  paymentModel: string;
 };
 
 export type OperationsEvent = {
@@ -1170,6 +1208,12 @@ export async function fetchOperationsHealth(): Promise<OperationsHealth> {
     openCriticalEvents: Number(row.open_critical_events ?? 0),
     identityDocumentsDue: Number(row.identity_documents_due ?? 0),
     checkedAt: String(row.checked_at ?? ""),
+    analyticsIngestConfigured: Boolean(row.analytics_ingest_configured),
+    mailConfigured: Boolean(row.mail_configured),
+    checkout: String(row.checkout ?? "hosted"),
+    storage: String(row.storage ?? "d1"),
+    r2Enabled: Boolean(row.r2_enabled),
+    paymentModel: String(row.payment_model ?? "attestation"),
   };
 }
 

@@ -8,8 +8,7 @@ agreement, and only then do developers bid — all against identical, frozen
 scope. What the buyer approved is what gets delivered.
 
 Buyers range from a two-counter bakery to a Fortune 500 insurer. Developers
-verify their identity and pay a one-time **$11 membership** to unlock bidding.
-A recorded build interview is the next gate.
+verify their identity, pass a timed build exam, and pay a one-time **$11 membership** to unlock bidding.
 
 ## Run it
 
@@ -18,8 +17,9 @@ npm install
 npm run dev
 ```
 
-Open http://127.0.0.1:5180. The app runs on seeded demo data until Supabase
-credentials are present.
+Open http://127.0.0.1:5180. Without `VITE_OKAVO_API_URL` the workspace uses the
+in-browser demo. Production calls the Cloudflare Worker and D1. Supabase is not
+the live database.
 
 | Command | Does |
 |---------|------|
@@ -40,7 +40,7 @@ Sign in at `/signin` and pick a role. The workspace changes completely.
 | `/app/project/:id` | Requirement, lock signature, incoming bids, hire |
 | `/app/contract/:id` | The contract: scope, milestones, change orders |
 | `/app/contracts` | Every contract and its stage |
-| `/app/payments` | Milestone ledger (confirmed outside Okavo until escrow ships) |
+| `/app/payments` | Milestone ledger. Payments recorded here are attestations, not escrow |
 | `/app/messages` | Conversations with developers |
 
 ### Developer
@@ -62,8 +62,9 @@ describe → review scope → sign lock → bids open → hire
    → change orders / disputes → review → close
 ```
 
-(Okavo-held escrow for build payments is next; until then buyers pay developers
-directly against the locked milestone schedule.)
+Buyers pay developers directly against the locked milestone schedule, then record
+that payment in Okavo. That record is an attestation. Okavo does not hold the
+money in escrow.
 
 Every stage is clickable in the demo.
 

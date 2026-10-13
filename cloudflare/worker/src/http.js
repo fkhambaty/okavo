@@ -21,7 +21,7 @@ export function fileResponse(bytes, mime, origin) {
   };
   if (origin) {
     headers["access-control-allow-origin"] = origin;
-    headers["access-control-allow-headers"] = "authorization, content-type, x-okavo-ingest, x-okavo-client-ip";
+    headers["access-control-allow-headers"] = "authorization, content-type, x-okavo-ingest, x-okavo-ops, x-okavo-client-ip";
     headers["access-control-allow-methods"] = "GET, POST, OPTIONS";
     headers.vary = "Origin";
   }
@@ -35,7 +35,7 @@ export function json(body, status, origin) {
   };
   if (origin) {
     headers["access-control-allow-origin"] = origin;
-    headers["access-control-allow-headers"] = "authorization, content-type, x-okavo-ingest, x-okavo-client-ip";
+    headers["access-control-allow-headers"] = "authorization, content-type, x-okavo-ingest, x-okavo-ops, x-okavo-client-ip";
     headers["access-control-allow-methods"] = "GET, POST, OPTIONS";
     headers.vary = "Origin";
   }

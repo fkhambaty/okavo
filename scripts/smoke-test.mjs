@@ -17,6 +17,11 @@ import {
   restAs,
 } from "./lib/okavo-env.mjs";
 
+console.error(
+  "npm run smoke targeted Supabase and is retired. Use node scripts/production-smoke.mjs for the live site. It does not create an account or a charge.",
+);
+process.exit(1);
+
 const target = resolveTarget();
 const URL = target.supabaseUrl;
 const KEY = requireAnonKey(target);

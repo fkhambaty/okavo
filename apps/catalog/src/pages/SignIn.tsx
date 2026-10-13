@@ -222,6 +222,7 @@ export default function SignIn() {
             ? "Accounts are confirmed with an email code before they can sign in."
             : "Demo mode — the live account service is not configured in this build."}
         </p>
+        <p className="auth-step">1 · Account</p>
 
         {auth.connected && (
           <div className="tabs">
@@ -249,6 +250,8 @@ export default function SignIn() {
         )}
 
         {(mode === "signup" || !auth.connected) && (
+          <>
+          <p className="auth-step">2 · Which side</p>
           <div className="role-choice">
             <button
               type="button"
@@ -278,7 +281,11 @@ export default function SignIn() {
               </span>
             </button>
           </div>
+          </>
         )}
+
+        {(mode === "signup" || !auth.connected) && <p className="auth-step">3 · Your details</p>}
+        {auth.connected && mode === "signin" && <p className="auth-step">2 · Credentials</p>}
 
         {auth.connected && (
           <>

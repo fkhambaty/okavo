@@ -1,13 +1,11 @@
 name: Identity retention sweep
 
-# Purges identity documents past their 90-day retention deadline and completes
-# account-erasure requests. The edge function guards itself with
-# IDENTITY_SWEEP_SECRET (x-okavo-notify) and runs with verify_jwt = false, so
-# this job never handles a Supabase key.
+# Asks the Worker to delete identity files whose 90-day window has ended.
+# The Worker cron does the same job. This workflow is the visible check that
+# the ops secret is wired. It never prints the secret.
 
 on:
   schedule:
-    # Weekly, Mondays 03:17 UTC (off the hour to avoid scheduler contention).
     - cron: "17 3 * * 1"
   workflow_dispatch:
 
@@ -20,29 +18,34 @@ jobs:
     name: Run retention sweep
     runs-on: ubuntu-latest
     steps:
-      - name: Detect secrets
+      - name: Require the ops secret
         id: secrets
+        env:
+          OPS_CRON_SECRET: ${{ secrets.OPS_CRON_SECRET }}
         run: |
-          echo "configured=false" >> "$GITHUB_OUTPUT"
-          echo "Supabase identity sweep was retired on 13 October 2026. Document storage is not configured on D1."
+          if [ -z "$OPS_CRON_SECRET" ]; then
+            echo "::error::OPS_CRON_SECRET is not set. The Worker cron can still purge, but this job cannot call it."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          echo "configured=true" >> "$GITHUB_OUTPUT"
 
-      - name: Invoke identity-retention-sweep
+      - name: Invoke Worker retention
         if: steps.secrets.outputs.configured == 'true'
         env:
-          PROD_SUPABASE_URL: ${{ secrets.PROD_SUPABASE_URL }}
-          IDENTITY_SWEEP_SECRET: ${{ secrets.IDENTITY_SWEEP_SECRET }}
+          OPS_CRON_SECRET: ${{ secrets.OPS_CRON_SECRET }}
         run: |
           set -euo pipefail
-          url="${PROD_SUPABASE_URL%/}/functions/v1/identity-retention-sweep"
           body="$(mktemp)"
-          status="$(curl -sS -o "$body" -w '%{http_code}' -X POST "$url" \
-            -H "x-okavo-notify: ${IDENTITY_SWEEP_SECRET}" \
+          status="$(curl -sS -o "$body" -w '%{http_code}' -X POST \
+            "https://okavo-api.fkhambaty.workers.dev/v1/ops/retention" \
+            -H "x-okavo-ops: ${OPS_CRON_SECRET}" \
             -H "content-type: application/json" \
             --data '{}')"
           echo "HTTP $status"
-          cat "$body"
-          echo
+          # Do not print the body if it might echo a header. Print only the status fields we expect.
+          node -e 'const fs=require("fs"); const raw=fs.readFileSync(process.argv[1],"utf8"); const data=JSON.parse(raw); const safe={ok:data.ok,purged:data.purged,storage:data.storage,error:data.error}; console.log(JSON.stringify(safe));' "$body"
           if [ "$status" != "200" ]; then
-            echo "::error::identity-retention-sweep returned $status"
+            echo "::error::retention returned $status"
             exit 1
           fi

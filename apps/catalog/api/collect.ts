@@ -2,13 +2,16 @@
  * Analytics collector.
  *
  * Runs on Vercel's edge so it can read the visitor's location from the
- * request headers, then writes one row per page view to Supabase using the
- * service role. The browser never touches the analytics table.
+ * request headers, then writes one row per page view through the Worker.
+ * The browser never touches the analytics table. A missing ingest secret
+ * returns 503 instead of a silent 204.
  *
  * The raw IP address is never stored. It is folded into a daily salted hash
  * that lets us count unique people without being able to identify one, and
  * that hash changes every day.
  */
+
+import { analyticsReadiness } from "./analytics-readiness.mjs";
 
 export const config = { runtime: "edge" };
 
@@ -173,9 +176,12 @@ export default async function handler(req: Request): Promise<Response> {
 
   const apiUrl = process.env.OKAVO_API_URL ?? process.env.VITE_OKAVO_API_URL;
   const ingestSecret = process.env.ANALYTICS_INGEST_SECRET;
-  if (!apiUrl || !ingestSecret) {
-    // Never fail the page over analytics.
-    return new Response(null, { status: 204, headers });
+  const readiness = analyticsReadiness({ apiUrl, ingestSecret });
+  if (!readiness.ok) {
+    return new Response(
+      JSON.stringify({ error: "analytics_misconfigured", missing: readiness.missing }),
+      { status: 503, headers: { ...headers, "content-type": "application/json" } },
+    );
   }
 
   let beacon: Beacon;
@@ -243,7 +249,7 @@ export default async function handler(req: Request): Promise<Response> {
   };
 
   try {
-    await fetch(`${apiUrl.replace(/\/$/, "")}/v1/analytics/collect`, {
+    const upstream = await fetch(`${apiUrl.replace(/\/$/, "")}/v1/analytics/collect`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -251,8 +257,17 @@ export default async function handler(req: Request): Promise<Response> {
       },
       body: JSON.stringify(row),
     });
+    if (!upstream.ok) {
+      return new Response(
+        JSON.stringify({ error: "analytics_ingest_rejected", status: upstream.status }),
+        { status: 502, headers: { ...headers, "content-type": "application/json" } },
+      );
+    }
   } catch {
-    // Swallow: a dropped analytics beacon must never surface to a visitor.
+    return new Response(
+      JSON.stringify({ error: "analytics_ingest_unreachable" }),
+      { status: 502, headers: { ...headers, "content-type": "application/json" } },
+    );
   }
 
   return new Response(null, { status: 204, headers });

@@ -20,6 +20,11 @@ import {
   resolveTarget,
 } from "./lib/okavo-env.mjs";
 
+console.error(
+  "seed:accounts is retired. Supabase was deleted. Create an account at https://okavo.org/signin and confirm the email code. This script does not insert rows.",
+);
+process.exit(1);
+
 const target = resolveTarget();
 assertSafeForDestructiveSeed(target);
 

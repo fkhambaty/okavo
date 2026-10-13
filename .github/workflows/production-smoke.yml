@@ -1,0 +1,34 @@
+name: Production smoke
+
+on:
+  schedule:
+    - cron: "23 6 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: production-smoke
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: Homepage, health, dummy login, no-charge quote
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Smoke
+        env:
+          OKAVO_SITE: https://okavo.org
+          OKAVO_API_URL: https://okavo-api.fkhambaty.workers.dev
+        run: node scripts/production-smoke.mjs
