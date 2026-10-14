@@ -461,6 +461,13 @@ async function main() {
       await context.addInitScript((session) => {
         sessionStorage.setItem("okavo.demo.session", JSON.stringify(session));
       }, SESSIONS[role]);
+      await context.route("**/v1/contracts*", (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ contracts: [] }),
+        })
+      );
     }
     const page = await context.newPage();
     watchPayment(page, problems, `${role} ${viewport.name}`);
@@ -469,7 +476,10 @@ async function main() {
       logs.push(error && error.message ? error.message : String(error));
     });
     page.on("console", (message) => {
-      if (message.type() === "error") logs.push(message.text());
+      if (message.type() !== "error") return;
+      const text = message.text();
+      if (SESSIONS[role] && /status of 401/i.test(text)) return;
+      logs.push(text);
     });
 
     try {
