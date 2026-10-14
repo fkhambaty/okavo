@@ -2,14 +2,16 @@
   "name": "okavo",
   "private": true,
   "workspaces": [
-    "apps/catalog"
+    "apps/catalog",
+    "packages/core"
   ],
   "scripts": {
     "dev": "npm run dev -w apps/catalog -- --host 127.0.0.1 --port 5180 --strictPort",
-    "build": "npm run build -w apps/catalog",
+    "build": "npm run build -w @okavo/core && npm run build -w apps/catalog",
     "preview": "npm run preview -w apps/catalog",
     "lint": "npm run lint -w apps/catalog",
-    "typecheck": "npm exec -w apps/catalog -- tsc -b --force",
+    "typecheck": "npm run build -w @okavo/core && npm exec -w apps/catalog -- tsc -b --force",
+    "test:core": "npm test -w @okavo/core",
     "okavo": "node scripts/okavo.mjs",
     "smoke": "node scripts/production-smoke.mjs",
     "rls": "node scripts/rls-matrix.mjs",

@@ -78,17 +78,18 @@ https://okavo.org/signin.
 - Payment amounts are decided in the edge functions, never accepted from the
   browser, and a payment is only marked paid by a signature-verified webhook
   (or confirm path) through `settle_provider_payment`.
-- Sessions use the Vercel `/api/auth` receptionist: HttpOnly refresh cookie +
-  memory-only access token. Do not reintroduce `localStorage` session persistence.
+- Sessions on the website use the Vercel auth receptionist: HttpOnly refresh cookie + memory-only access token. The iOS and Android app calls Worker `/v1/auth` directly and stores only the refresh token in SecureStore. Do not put either session in `localStorage` or `AsyncStorage`. Account deletion is Worker `POST /v1/auth/account/delete` (current password plus the exact phrase) and the mobile Account screen. It is not a website page.
 
 ## Checking your work
 
 ```bash
 cd apps/catalog && npx tsc -b --force   # `tsc --noEmit` alone does NOT check this project
-npm run build                            # also prerenders the marketing pages
+npm run build                            # builds @okavo/core, then the website
 npm run lint
 npm run typecheck
 npm test                                 # Worker pure tests
+npm test -w @okavo/core                  # shared pricing, session, file, and link tests
+cd apps/mobile && npm run typecheck && npm run lint && npm test && npx expo-doctor
 VITE_OKAVO_API_URL=https://okavo-api.fkhambaty.workers.dev npm run build
 npm run responsive                       # after that build; see docs/responsive.md
 ```
@@ -102,6 +103,8 @@ references. Use `tsc -b --force`.
 |------|------|
 | `apps/catalog/src` | The React app |
 | `apps/catalog/api` | Vercel edge functions (auth receptionist, analytics collector) |
+| `apps/mobile` | Expo app for iOS and Android. See `docs/MOBILE_ARCHITECTURE.md` |
+| `packages/core` | Shared pricing, guardrails, terms version, file checks, and session helpers |
 | `cloudflare/worker` | Production API |
 | `cloudflare/d1` | D1 schema |
 | `supabase/` | Retired. Not the live database |

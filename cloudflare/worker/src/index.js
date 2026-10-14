@@ -1,3 +1,4 @@
+import { deleteAccount } from "./accountDeletion.js";
 import {
   changePassword,
   login,
@@ -198,6 +199,9 @@ export default {
       if (request.method === "GET" && path === "/v1/me") return json(await me(db, user), 200, origin);
       if (request.method === "POST" && path === "/v1/auth/password") {
         return json(await changePassword(db, user, await readJson(request)), 200, origin);
+      }
+      if (request.method === "POST" && path === "/v1/auth/account/delete") {
+        return json(await deleteAccount(db, env, user, await readJson(request)), 200, origin);
       }
       if (request.method === "GET" && path === "/v1/projects") return json(await listProjects(db, user), 200, origin);
       if (request.method === "POST" && path === "/v1/projects") {

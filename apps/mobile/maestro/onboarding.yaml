@@ -1,0 +1,11 @@
+appId: org.okavo.app
+---
+- launchApp:
+    clearState: true
+- assertVisible: "Okavo"
+- assertVisible: "Buyers lock a software scope.*"
+- tapOn: "Sign in"
+- assertVisible: "Use the email and password for your Okavo account.*"
+- assertVisible: "I forgot my password"
+- back
+- assertVisible: "Create account"

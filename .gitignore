@@ -1,5 +1,9 @@
 node_modules
 dist
+packages/core/dist
+apps/mobile/.expo
+apps/mobile/android
+apps/mobile/ios
 .DS_Store
 *.local
 .env

@@ -1,0 +1,71 @@
+{
+  "expo": {
+    "name": "Okavo",
+    "slug": "okavo",
+    "scheme": "okavo",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#fbfaf7",
+    "ios": {
+      "bundleIdentifier": "org.okavo.app",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Okavo uses the camera so you can photograph an identity document or selfie for verification.",
+        "NSPhotoLibraryUsageDescription": "Okavo uses your photos so you can choose an identity document or payment proof.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "org.okavo.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#0c0d10",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "permissions": ["android.permission.CAMERA"],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": false,
+          "data": [{ "scheme": "okavo" }],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-sharing",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0c0d10",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 220
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Okavo uses your photos so you can choose an identity document or payment proof.",
+          "cameraPermission": "Okavo uses the camera so you can photograph an identity document or selfie for verification."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#e8973a"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false,
+      "reactCompiler": false
+    },
+    "extra": {
+      "apiUrl": "https://okavo-api.fkhambaty.workers.dev"
+    }
+  }
+}

@@ -10,6 +10,33 @@ Signup does not create a session until a 6-digit email code is confirmed. Passwo
 
 Okavo payments are disabled as of 13 October 2026. Razorpay rejected `okavo.org` on the FKTech EdTech merchant because Okavo is a marketplace. The Worker has an empty `RAZORPAY_KEY_ID` and `RAZORPAY_PAYMENTS_ENABLED = "false"`, so it refuses checkout before contacting Razorpay. Re-enable payments only after a separate marketplace merchant account approves `okavo.org`, then install that account's key id, key secret, and product-specific webhook secret. The Worker still owns amounts and only marks a payment paid after signature and provider checks. The dummy login (`dummy` / `dummy`) stays in the browser, uses fixture rows, and never calls the Worker or Razorpay.
 
+## Native app as of 14 October 2026
+
+`apps/mobile` is the Expo app for iOS and Android. Its bundle id and Android package are `org.okavo.app`. The workspace is native. A WebView opens only the allowlisted `https://okavo.org` legal and marketing pages listed in `docs/MOBILE_ARCHITECTURE.md`.
+
+The phone does not use the Vercel `/api/auth` cookie. It calls Worker `/v1/auth` directly. The access token stays in memory. The refresh token is stored in the device keychain through SecureStore and rotated with one in-flight request. Logout deletes both server sessions. This does not change the website receptionist.
+
+The app deletes the signed-in account with `POST /v1/auth/account/delete`. The body is the current password and the exact phrase `DELETE MY OKAVO ACCOUNT`. Demo and fixture emails are refused. A profile with no shared contract, bid, payment, review, dispute, message, or audit history is deleted, and an empty buyer draft cascades with it. When that history exists, the profile id stays so the other party's contract is not cascaded away; the name, email, password, and private files are removed, and every session is deleted. The website does not add a deletion page.
+
+Checkout stays off. The app shows the server quote with `charge: false` and does not open Razorpay. Milestone screens can record a payment the buyer made outside Okavo, which is the existing attestation path.
+
+Framework-neutral pricing, guardrails, terms version, file checks, and session rotation live in `packages/core`. The website re-exports pricing, guardrails, and the terms version from that package so the two clients cannot drift. `docs/MOBILE_ARCHITECTURE.md` and `docs/MOBILE_RELEASE.md` are the mobile map and the release steps.
+
+```mermaid
+flowchart LR
+  phone[Okavo iOS and Android]
+  web[Browser at okavo.org]
+  vercel["Vercel /api/auth<br/>HttpOnly refresh cookie"]
+  worker["Worker /v1/auth<br/>and /v1 marketplace"]
+  d1["D1 database okavo"]
+  phone -->|"Bearer access token<br/>refresh in SecureStore"| worker
+  web --> vercel
+  vercel --> worker
+  worker --> d1
+```
+
+Universal links, App Store billing, and remote push are not configured. Expo web is not a supported client: the Worker rejects browser origins outside the website list, and a native request omits Origin.
+
 ```mermaid
 flowchart LR
   browser[Browser]
@@ -137,6 +164,8 @@ There is no separate application server. If Supabase is paused, sign-in, bids, a
 ```
 apps/catalog/src          React app. Routes are in src/App.tsx.
 apps/catalog/api          Vercel functions (auth receptionist, analytics).
+apps/mobile               Expo app. Native workspace, SecureStore refresh token.
+packages/core             Shared pricing, guardrails, terms version, and mobile session helpers.
 supabase/migrations       Schema, RLS, triggers. 25 migrations in git.
 supabase/functions        razorpay-order, razorpay-webhook, razorpay-confirm,
                           razorpay-reconcile, exam-analyze, notify-signup,

@@ -20,6 +20,9 @@ jobs:
         with:
           node-version: "22"
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            apps/mobile/package-lock.json
 
       - name: Install
         run: npm ci
@@ -37,3 +40,18 @@ jobs:
         env:
           VITE_OKAVO_API_URL: https://okavo-api.fkhambaty.workers.dev
         run: npm run build
+
+      - name: Shared package tests
+        run: npm test -w @okavo/core
+
+      - name: Install mobile app
+        working-directory: apps/mobile
+        run: npm ci
+
+      - name: Mobile typecheck, lint, tests, Expo Doctor
+        working-directory: apps/mobile
+        run: |
+          npm run typecheck
+          npm run lint
+          npm test
+          npx expo-doctor
