@@ -233,12 +233,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setNotice(null);
     try {
       await resendSignupVerification(email);
-      setNotice(`Verification link sent again to ${email}.`);
+      setNotice(`Verification code sent again to ${email}.`);
     } catch (resendError) {
       setError(
         resendError instanceof Error
           ? resendError.message
-          : "Could not resend the verification link."
+          : "Could not resend the verification code."
       );
     }
   }, []);

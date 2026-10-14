@@ -400,6 +400,7 @@ export async function changePassword(db, user, body) {
     .prepare("UPDATE profiles SET password_hash = ?, password_salt = ?, updated_at = ? WHERE id = ?")
     .bind(await hashPassword(password, salt), salt, nowIso(), user.id)
     .run();
+  await db.prepare("DELETE FROM sessions WHERE user_id = ?").bind(user.id).run();
   return { ok: true };
 }
 

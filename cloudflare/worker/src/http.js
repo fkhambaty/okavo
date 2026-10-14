@@ -21,7 +21,7 @@ export function fileResponse(bytes, mime, origin) {
   };
   if (origin) {
     headers["access-control-allow-origin"] = origin;
-    headers["access-control-allow-headers"] = "authorization, content-type, x-okavo-ingest, x-okavo-ops, x-okavo-client-ip";
+    headers["access-control-allow-headers"] = "authorization, content-type, x-okavo-ingest, x-okavo-ops";
     headers["access-control-allow-methods"] = "GET, POST, OPTIONS";
     headers.vary = "Origin";
   }
@@ -35,7 +35,7 @@ export function json(body, status, origin) {
   };
   if (origin) {
     headers["access-control-allow-origin"] = origin;
-    headers["access-control-allow-headers"] = "authorization, content-type, x-okavo-ingest, x-okavo-ops, x-okavo-client-ip";
+    headers["access-control-allow-headers"] = "authorization, content-type, x-okavo-ingest, x-okavo-ops";
     headers["access-control-allow-methods"] = "GET, POST, OPTIONS";
     headers.vary = "Origin";
   }
@@ -58,9 +58,7 @@ export async function readJson(request) {
 
 export function clientIp(request) {
   return (
-    request.headers.get("x-okavo-client-ip") ||
     request.headers.get("cf-connecting-ip") ||
-    (request.headers.get("x-forwarded-for") || "").split(",")[0].trim() ||
     "unknown"
   );
 }

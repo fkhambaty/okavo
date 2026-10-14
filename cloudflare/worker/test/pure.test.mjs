@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { clientIp } from "../src/http.js";
 import {
   FILE_CHUNK_CHARS,
   FILE_MAX_BYTES,
@@ -17,6 +18,17 @@ import {
   sniffMime,
   timingSafeEqual,
 } from "../src/pure.js";
+
+test("rate limiting trusts Cloudflare's address and ignores caller-supplied aliases", () => {
+  const request = new Request("https://api.okavo.org/v1/auth/login", {
+    headers: {
+      "cf-connecting-ip": "203.0.113.8",
+      "x-forwarded-for": "198.51.100.4",
+      "x-okavo-client-ip": "192.0.2.5",
+    },
+  });
+  assert.equal(clientIp(request), "203.0.113.8");
+});
 
 test("hire fee is chosen by the server from the bid, with a ₹99 floor", () => {
   assert.equal(hireFeePaise(100), 9900);

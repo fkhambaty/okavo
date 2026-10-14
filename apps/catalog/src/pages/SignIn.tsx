@@ -4,7 +4,6 @@ import Logo from "../components/Logo";
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "../brand";
 import { acceptPlatformTerms } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { MEMBERSHIP_FEE_LABEL } from "../lib/pricing";
 import { TERMS_VERSION } from "../lib/terms";
 import type { BuyerScale, Role } from "../types";
 
@@ -276,7 +275,8 @@ export default function SignIn() {
               <span>
                 <strong>I build software</strong>
                 <span>
-                  Verify identity, pay the one-time {MEMBERSHIP_FEE_LABEL} membership, then bid.
+                  Verify identity and pass the build exam. Bidding activation stays unavailable
+                  until Okavo&apos;s separate marketplace payment account is approved.
                 </span>
               </span>
             </button>

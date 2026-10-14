@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { money } from "../../format";
-import { MEMBERSHIP_FEE_LABEL } from "../../lib/pricing";
 import { useStore } from "../../store";
 
 const SCALES = ["Local business", "SMB", "Startup", "Enterprise"];
@@ -48,16 +47,16 @@ export default function DevBoard() {
         {!developerAccount.membershipPaid && (
           <div className="paywall" style={{ marginBottom: "1.25rem" }}>
             <div>
-              <strong>Browse free — pay only when you bid</strong>
+              <strong>Browse free — bidding activation is not open yet</strong>
               <p>
-                Review sample screens and the checklist with no fee. A one-time{" "}
-                {MEMBERSHIP_FEE_LABEL} membership plus identity approval unlocks
-                your first bid — not browsing.
+                Review sample screens and the checklist with no fee. Identity and
+                exam approval can continue, but payment activation is waiting for
+                Okavo&apos;s separate marketplace merchant account.
               </p>
             </div>
             <div>
               <Link className="btn btn-sm" to="/app/verification">
-                Unlock bidding ({MEMBERSHIP_FEE_LABEL})
+                View verification
               </Link>
             </div>
           </div>

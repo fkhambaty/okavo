@@ -85,6 +85,10 @@ import {
 import { confirmOrder, confirmPaymentLink, createHostedLink, createOrder, paymentStatus, quoteFee, reconcilePending, webhook } from "./payments.js";
 import { checkoutMode, mailConfigured, opsAuthStatus, secretConfigured, storageBackend } from "./pure.js";
 
+function d1DailyLimitReached(error) {
+  return /exceeded D1's free tier daily row (?:write|read) limit/i.test(String(error?.message || ""));
+}
+
 async function mailDomainVerified(env) {
   if (!mailConfigured(env)) return false;
   const domain = (String(env.MAIL_FROM).match(/@([^>\s]+)/) || [])[1]?.toLowerCase();
@@ -346,6 +350,14 @@ export default {
       return json({ error: "Not found", unimplemented: true }, 404, origin);
     } catch (error) {
       if (error instanceof HttpError) return json({ error: error.message }, error.status, origin);
+      console.error("request failed", request.method, path, error?.name || "Error", error?.message || "unknown");
+      if (d1DailyLimitReached(error)) {
+        return json(
+          { error: "Accounts and saved work are temporarily unavailable because today's storage allowance has been reached. Nothing was charged. Please try again after the daily reset." },
+          503,
+          origin,
+        );
+      }
       return json({ error: "The database did not accept that request." }, 500, origin);
     }
   },

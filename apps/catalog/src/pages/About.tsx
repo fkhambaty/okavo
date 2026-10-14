@@ -21,7 +21,7 @@ const PRINCIPLES = [
   },
   {
     title: "Say the price out loud",
-    body: `${POSTING_FEE_LABEL} to post a requirement. ${MEMBERSHIP_FEE_LABEL} once for a developer to start bidding. Marketplace commission is a flat 10% on the awarded build — that cut is not auto-collected yet; posting and membership fees are live. No enterprise tier with a hidden number.`,
+    body: `${POSTING_FEE_LABEL} to post a requirement. ${MEMBERSHIP_FEE_LABEL} once for a developer to start bidding. Marketplace commission is a flat 10% on the awarded build. These charges remain disabled until Okavo's separate marketplace merchant account is approved. No enterprise tier with a hidden number.`,
   },
   {
     title: "Everyone gets the same product",

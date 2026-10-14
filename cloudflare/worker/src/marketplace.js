@@ -368,6 +368,7 @@ export async function lockProject(db, user, projectId, body) {
 export async function placeBid(db, user, projectId, body) {
   requireUser(user);
   if (user.role !== "developer" && !isAdmin(user)) throw new HttpError(403, "Only developers can bid");
+  if (!user.terms_accepted_at) throw new HttpError(403, "Accept the Okavo Terms before bidding");
   const dev = await db.prepare("SELECT * FROM developer_profiles WHERE profile_id = ?").bind(user.id).first();
   if (!dev || dev.identity_status !== "approved") throw new HttpError(403, "Identity verification must be approved before bidding");
   if (dev.interview_status !== "approved") throw new HttpError(403, "The build exam must be approved before bidding");

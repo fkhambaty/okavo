@@ -4,8 +4,10 @@ import { DatabaseSync } from "node:sqlite";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { changePassword } from "../src/auth.js";
 import { purgeExpiredIdentityFiles, storePrivateFile } from "../src/files.js";
 import { HttpError } from "../src/http.js";
+import worker from "../src/index.js";
 import {
   awardBid,
   liquidity,
@@ -52,6 +54,26 @@ function openDb() {
 }
 
 const NOW = "2026-10-13T00:00:00.000Z";
+
+test("D1 daily quota exhaustion returns a clear retryable response", async () => {
+  const db = {
+    prepare() {
+      throw new Error("D1_ERROR: Your account has exceeded D1's free tier daily row write limit.");
+    },
+  };
+  const response = await worker.fetch(
+    new Request("https://api.okavo.org/v1/auth/signup", {
+      method: "POST",
+      headers: { origin: "https://okavo.org", "content-type": "application/json" },
+      body: JSON.stringify({ email: "quota@example.com", password: "password12" }),
+    }),
+    { DB: db },
+  );
+  const body = await response.json();
+  assert.equal(response.status, 503);
+  assert.match(body.error, /storage allowance/i);
+  assert.match(body.error, /Nothing was charged/i);
+});
 
 function person(id, role) {
   return {
@@ -138,6 +160,19 @@ test("a posting fee is consumed once and a second requirement is refused", async
   assert.equal(Number(projects.count), 1);
 });
 
+test("changing a password revokes every existing session", async () => {
+  const db = openDb();
+  const buyer = person("buyer-password", "buyer");
+  await insertProfile(db, buyer, "buyer");
+  await db
+    .prepare("INSERT INTO sessions (token_hash, user_id, kind, expires_at, created_at) VALUES ('access', ?, 'access', ?, ?)")
+    .bind(buyer.id, "2027-10-13T00:00:00.000Z", NOW)
+    .run();
+  await changePassword(db, buyer, { password: "new-password-123" });
+  const sessions = await db.prepare("SELECT COUNT(*) AS count FROM sessions WHERE user_id = ?").bind(buyer.id).first();
+  assert.equal(Number(sessions.count), 0);
+});
+
 test("bids require identity, the exam, membership, and an unlocked account", async () => {
   const db = openDb();
   const buyer = person("buyer-2", "buyer");
@@ -157,6 +192,11 @@ test("bids require identity, the exam, membership, and an unlocked account", asy
 
   await db.prepare("UPDATE developer_profiles SET bidding_unlocked_at = ? WHERE profile_id = ?").bind(NOW, developer.id).run();
   await placeBid(db, developer, published.id, { amount_cents: 150000, delivery_weeks: 4 });
+
+  await expectStatus(
+    placeBid(db, { ...developer, terms_accepted_at: null }, published.id, { amount_cents: 150000, delivery_weeks: 4 }),
+    403,
+  );
 
   await db.prepare("UPDATE developer_profiles SET blocked_at = ? WHERE profile_id = ?").bind(NOW, developer.id).run();
   const other = person("dev-2", "developer");
