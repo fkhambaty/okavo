@@ -208,3 +208,5 @@ The viewport matrix and how to run it are in `docs/responsive.md`.
 `https://github.com/fkhambaty/okavo` is the copy that matters. It contains this guide, `AGENTS.md`, `docs/deploy.md`, the catalog app, the Worker, and the D1 schema. Vercel rebuilds the website from that repository.
 
 These names are Worker secrets and are not stored in Git: `RESEND_API_KEY`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `ANALYTICS_INGEST_SECRET`, and `OPS_CRON_SECRET`. They remain in Cloudflare even if this laptop is lost. `RAZORPAY_KEY_ID` is blank in `wrangler.toml` on purpose, and `RAZORPAY_PAYMENTS_ENABLED` is `false`. A local copy under `~/.config/fk-products/` is only a convenience and must never be committed. Do not put the old EdTech Razorpay key back into Okavo.
+
+The estate-wide handover (all three products, accounts, DNS, runbooks, history and diagrams) is the private repository https://github.com/fkhambaty/products-handover. Start there on a new computer.
