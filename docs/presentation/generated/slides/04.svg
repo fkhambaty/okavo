@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+    <defs>
+      <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#0A0B0D" flood-opacity="0.12"/>
+      </filter>
+      <clipPath id="phoneClip"><rect x="1166" y="95" width="304" height="660" rx="42"/></clipPath>
+    </defs>
+    
+    
+    <rect width="1600" height="900" fill="#F5F2EC"/>
+    <circle cx="1510" cy="-30" r="245" fill="#B66A0A" opacity="0.11"/>
+    <circle cx="35" cy="910" r="210" fill="#D6A655" opacity="0.09"/>
+    <rect x="64" y="46" width="272" height="42" rx="21" fill="#F1E2C9"/>
+    <text x="200" y="74" fill="#B66A0A" font-family="Archivo" font-size="17" font-weight="700" text-anchor="middle" opacity="1"  letter-spacing="1.1">
+    <tspan x="200" dy="0">MARKETPLACE JOURNEY</tspan>
+  </text>
+    <text x="64" y="132" fill="#0A0B0D" font-family="Archivo" font-size="48" font-weight="800" text-anchor="start" opacity="1"  letter-spacing="0">
+    <tspan x="64" dy="0">From requirement to accountable</tspan><tspan x="64" dy="56">delivery</tspan>
+  </text>
+    <line x1="64" y1="842" x2="1536" y2="842" stroke="#D9D1C4" stroke-width="2"/>
+    <text x="64" y="874" fill="#66635D" font-family="Inter" font-size="17" font-weight="600" text-anchor="start" opacity="1"  letter-spacing="0">
+    <tspan x="64" dy="0">Okavo</tspan>
+  </text>
+    <text x="1536" y="874" fill="#66635D" font-family="Inter" font-size="17" font-weight="700" text-anchor="end" opacity="1"  letter-spacing="0">
+    <tspan x="1536" dy="0">04</tspan>
+  </text>
+  
+    <text x="64" y="225" fill="#66635D" font-family="Inter" font-size="26" font-weight="500" text-anchor="start" opacity="1"  letter-spacing="0">
+    <tspan x="64" dy="0">The product makes each transition visible so participants know what changed and who</tspan><tspan x="64" dy="35">acts next.</tspan>
+  </text>
+    <line x1="100" y1="455" x2="1500" y2="455" stroke="#D9D1C4" stroke-width="8" stroke-linecap="round"/>
+    
+        <circle cx="100" cy="455" r="42" fill="#FFFFFF" stroke="#B66A0A" stroke-width="4"/>
+        <text x="100" y="466" fill="#B66A0A" font-family="Archivo" font-size="25" font-weight="850" text-anchor="middle" opacity="1"  letter-spacing="0">
+    <tspan x="100" dy="0">1</tspan>
+  </text>
+        <text x="100" y="565" fill="#0A0B0D" font-family="Archivo" font-size="22" font-weight="800" text-anchor="middle" opacity="1"  letter-spacing="0">
+    <tspan x="100" dy="0">Define</tspan>
+  </text>
+        <text x="100" y="648" fill="#66635D" font-family="Inter" font-size="16" font-weight="500" text-anchor="middle" opacity="1"  letter-spacing="0">
+    <tspan x="100" dy="0">Write requirements</tspan>
+  </text>
+      
+        <circle cx="380" cy="455" r="42" fill="#FFFFFF" stroke="#B66A0A" stroke-width="4"/>
+        <text x="380" y="466" fill="#B66A0A" font-family="Archivo" font-size="25" font-weight="850" text-anchor="middle" opacity="1"  letter-spacing="0">
+    <tspan x="380" dy="0">2</tspan>
+  </text>
+        <text x="380" y="565" fill="#0A0B0D" font-family="Archivo" font-size="22" font-weight="800" text-anchor="middle" opacity="1"  letter-spacing="0">
+    <tspan x="380" dy="0">Discover</tspan>
+  </text>
+        <text x="380" y="648" fill="#66635D" font-family="Inter" font-size="16" font-weight="500" text-anchor="middle" opacity="1"  letter-spacing="0">
+    <tspan x="380" dy="0">Search talent</tspan>
+  </text>
+      
+        <circle cx="660" cy="455" r="42" fill="#FFFFFF" stroke="#B66A0A" stroke-width="4"/>
+        <text x="660" y="466" fill="#B66A0A" font-family="Archivo" font-size="25" font-weight="850" text-anchor="middle" opacity="1"  letter-spacing="0">
+    <tspan x="660" dy="0">3</tspan>
+  </text>
+        <text x="660" y="565" fill="#0A0B0D" font-family="Archivo" font-size="22" font-weight="800" text-anchor="middle" opacity="1"  letter-spacing="0">
+    <tspan x="660" dy="0">Bid</tspan>
+  </text>
+        <text x="660" y="648" fill="#66635D" font-family="Inter" font-size="16" font-weight="500" text-anchor="middle" opacity="1"  letter-spacing="0">
+    <tspan x="660" dy="0">Compare proposals</tspan>
+  </text>
+      
+        <circle cx="940" cy="455" r="42" fill="#FFFFFF" stroke="#B66A0A" stroke-width="4"/>
+        <text x="940" y="466" fill="#B66A0A" font-family="Archivo" font-size="25" font-weight="850" text-anchor="middle" opacity="1"  letter-spacing="0">
+    <tspan x="940" dy="0">4</tspan>
+  </text>
+        <text x="940" y="565" fill="#0A0B0D" font-family="Archivo" font-size="22" font-weight="800" text-anchor="middle" opacity="1"  letter-spacing="0">
+    <tspan x="940" dy="0">Contract</tspan>
+  </text>
+        <text x="940" y="648" fill="#66635D" font-family="Inter" font-size="16" font-weight="500" text-anchor="middle" opacity="1"  letter-spacing="0">
+    <tspan x="940" dy="0">Agree the work</tspan>
+  </text>
+      
+        <circle cx="1220" cy="455" r="42" fill="#FFFFFF" stroke="#B66A0A" stroke-width="4"/>
+        <text x="1220" y="466" fill="#B66A0A" font-family="Archivo" font-size="25" font-weight="850" text-anchor="middle" opacity="1"  letter-spacing="0">
+    <tspan x="1220" dy="0">5</tspan>
+  </text>
+        <text x="1220" y="565" fill="#0A0B0D" font-family="Archivo" font-size="22" font-weight="800" text-anchor="middle" opacity="1"  letter-spacing="0">
+    <tspan x="1220" dy="0">Collaborate</tspan>
+  </text>
+        <text x="1220" y="648" fill="#66635D" font-family="Inter" font-size="16" font-weight="500" text-anchor="middle" opacity="1"  letter-spacing="0">
+    <tspan x="1220" dy="0">Message + files</tspan>
+  </text>
+      
+        <circle cx="1500" cy="455" r="42" fill="#B66A0A" stroke="#B66A0A" stroke-width="4"/>
+        <text x="1500" y="466" fill="#FFFFFF" font-family="Archivo" font-size="25" font-weight="850" text-anchor="middle" opacity="1"  letter-spacing="0">
+    <tspan x="1500" dy="0">6</tspan>
+  </text>
+        <text x="1500" y="565" fill="#0A0B0D" font-family="Archivo" font-size="22" font-weight="800" text-anchor="middle" opacity="1"  letter-spacing="0">
+    <tspan x="1500" dy="0">Operate</tspan>
+  </text>
+        <text x="1500" y="648" fill="#66635D" font-family="Inter" font-size="16" font-weight="500" text-anchor="middle" opacity="1"  letter-spacing="0">
+    <tspan x="1500" dy="0">Track outcomes</tspan>
+  </text>
+      
+    <rect x="64" y="765" width="752" height="42" rx="21" fill="#F1E2C9"/>
+    <text x="440" y="793" fill="#B66A0A" font-family="Archivo" font-size="17" font-weight="700" text-anchor="middle" opacity="1"  letter-spacing="1.1">
+    <tspan x="440" dy="0">PAYMENTS REMAIN DISABLED UNTIL A VERIFIED MONEY FLOW EXISTS</tspan>
+  </text>
+  
+  </svg>

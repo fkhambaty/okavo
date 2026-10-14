@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+    <defs>
+      <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#0A0B0D" flood-opacity="0.12"/>
+      </filter>
+      <clipPath id="phoneClip"><rect x="1166" y="95" width="304" height="660" rx="42"/></clipPath>
+    </defs>
+    
+    
+    <rect width="1600" height="900" fill="#F5F2EC"/>
+    <circle cx="1510" cy="-30" r="245" fill="#B66A0A" opacity="0.11"/>
+    <circle cx="35" cy="910" r="210" fill="#D6A655" opacity="0.09"/>
+    <rect x="64" y="46" width="248" height="42" rx="21" fill="#F1E2C9"/>
+    <text x="188" y="74" fill="#B66A0A" font-family="Archivo" font-size="17" font-weight="700" text-anchor="middle" opacity="1"  letter-spacing="1.1">
+    <tspan x="188" dy="0">TRUST AND PRIVACY</tspan>
+  </text>
+    <text x="64" y="132" fill="#0A0B0D" font-family="Archivo" font-size="48" font-weight="800" text-anchor="start" opacity="1"  letter-spacing="0">
+    <tspan x="64" dy="0">Credibility comes from boundaries</tspan>
+  </text>
+    <line x1="64" y1="842" x2="1536" y2="842" stroke="#D9D1C4" stroke-width="2"/>
+    <text x="64" y="874" fill="#66635D" font-family="Inter" font-size="17" font-weight="600" text-anchor="start" opacity="1"  letter-spacing="0">
+    <tspan x="64" dy="0">Okavo</tspan>
+  </text>
+    <text x="1536" y="874" fill="#66635D" font-family="Inter" font-size="17" font-weight="700" text-anchor="end" opacity="1"  letter-spacing="0">
+    <tspan x="1536" dy="0">08</tspan>
+  </text>
+  
+    <text x="64" y="220" fill="#66635D" font-family="Inter" font-size="25" font-weight="500" text-anchor="start" opacity="1"  letter-spacing="0">
+    <tspan x="64" dy="0">Okavo is explicit about what it secures, what it records and what it does not</tspan><tspan x="64" dy="34">guarantee.</tspan>
+  </text>
+    <rect x="64" y="315" width="714" height="194" rx="24" fill="#F1E2C9" stroke="#D9D1C4" stroke-width="2"/>
+        <circle cx="118" cy="371" r="27" fill="#B66A0A"/>
+   <text x="118" y="378.02" fill="#FFFFFF" font-family="Archivo" font-size="23.22" font-weight="800" text-anchor="middle" opacity="1"  letter-spacing="0">
+    <tspan x="118" dy="0">S</tspan>
+  </text>
+        <text x="164" y="378" fill="#0A0B0D" font-family="Archivo" font-size="23" font-weight="800" text-anchor="start" opacity="1"  letter-spacing="0">
+    <tspan x="164" dy="0">Session security</tspan>
+  </text>
+        
+          <circle cx="176" cy="418" r="4" fill="#B66A0A"/>
+          <text x="192" y="424" fill="#66635D" font-family="Inter" font-size="16" font-weight="500" text-anchor="start" opacity="1"  letter-spacing="0">
+    <tspan x="192" dy="0">Rotating authenticated sessions</tspan>
+  </text>
+        
+          <circle cx="176" cy="448" r="4" fill="#B66A0A"/>
+          <text x="192" y="454" fill="#66635D" font-family="Inter" font-size="16" font-weight="500" text-anchor="start" opacity="1"  letter-spacing="0">
+    <tspan x="192" dy="0">Secure device token storage</tspan>
+  </text>
+        
+          <circle cx="176" cy="478" r="4" fill="#B66A0A"/>
+          <text x="192" y="484" fill="#66635D" font-family="Inter" font-size="16" font-weight="500" text-anchor="start" opacity="1"  letter-spacing="0">
+    <tspan x="192" dy="0">Role-aware route protection</tspan>
+  </text>
+        <rect x="808" y="315" width="714" height="194" rx="24" fill="#FFFFFF" stroke="#D9D1C4" stroke-width="2"/>
+        <circle cx="862" cy="371" r="27" fill="#F1E2C9"/>
+   <text x="862" y="378.02" fill="#B66A0A" font-family="Archivo" font-size="23.22" font-weight="800" text-anchor="middle" opacity="1"  letter-spacing="0">
+    <tspan x="862" dy="0">F</tspan>
+  </text>
+        <text x="908" y="378" fill="#0A0B0D" font-family="Archivo" font-size="23" font-weight="800" text-anchor="start" opacity="1"  letter-spacing="0">
+    <tspan x="908" dy="0">File handling</tspan>
+  </text>
+        
+          <circle cx="920" cy="418" r="4" fill="#B66A0A"/>
+          <text x="936" y="424" fill="#66635D" font-family="Inter" font-size="16" font-weight="500" text-anchor="start" opacity="1"  letter-spacing="0">
+    <tspan x="936" dy="0">Camera and file-picker support</tspan>
+  </text>
+        
+          <circle cx="920" cy="448" r="4" fill="#B66A0A"/>
+          <text x="936" y="454" fill="#66635D" font-family="Inter" font-size="16" font-weight="500" text-anchor="start" opacity="1"  letter-spacing="0">
+    <tspan x="936" dy="0">Controlled uploads</tspan>
+  </text>
+        
+          <circle cx="920" cy="478" r="4" fill="#B66A0A"/>
+          <text x="936" y="484" fill="#66635D" font-family="Inter" font-size="16" font-weight="500" text-anchor="start" opacity="1"  letter-spacing="0">
+    <tspan x="936" dy="0">Safe file downloads</tspan>
+  </text>
+        <rect x="64" y="539" width="714" height="194" rx="24" fill="#FFFFFF" stroke="#D9D1C4" stroke-width="2"/>
+        <circle cx="118" cy="595" r="27" fill="#F1E2C9"/>
+   <text x="118" y="602.02" fill="#B66A0A" font-family="Archivo" font-size="23.22" font-weight="800" text-anchor="middle" opacity="1"  letter-spacing="0">
+    <tspan x="118" dy="0">N</tspan>
+  </text>
+        <text x="164" y="602" fill="#0A0B0D" font-family="Archivo" font-size="23" font-weight="800" text-anchor="start" opacity="1"  letter-spacing="0">
+    <tspan x="164" dy="0">Notifications</tspan>
+  </text>
+        
+          <circle cx="176" cy="642" r="4" fill="#B66A0A"/>
+          <text x="192" y="648" fill="#66635D" font-family="Inter" font-size="16" font-weight="500" text-anchor="start" opacity="1"  letter-spacing="0">
+    <tspan x="192" dy="0">Action-oriented mobile alerts</tspan>
+  </text>
+        
+          <circle cx="176" cy="672" r="4" fill="#B66A0A"/>
+          <text x="192" y="678" fill="#66635D" font-family="Inter" font-size="16" font-weight="500" text-anchor="start" opacity="1"  letter-spacing="0">
+    <tspan x="192" dy="0">Deep-link aware routing</tspan>
+  </text>
+        
+          <circle cx="176" cy="702" r="4" fill="#B66A0A"/>
+          <text x="192" y="708" fill="#66635D" font-family="Inter" font-size="16" font-weight="500" text-anchor="start" opacity="1"  letter-spacing="0">
+    <tspan x="192" dy="0">Permission-aware behaviour</tspan>
+  </text>
+        <rect x="808" y="539" width="714" height="194" rx="24" fill="#FFFFFF" stroke="#D9D1C4" stroke-width="2"/>
+        <circle cx="862" cy="595" r="27" fill="#F1E2C9"/>
+   <text x="862" y="602.02" fill="#B66A0A" font-family="Archivo" font-size="23.22" font-weight="800" text-anchor="middle" opacity="1"  letter-spacing="0">
+    <tspan x="862" dy="0">D</tspan>
+  </text>
+        <text x="908" y="602" fill="#0A0B0D" font-family="Archivo" font-size="23" font-weight="800" text-anchor="start" opacity="1"  letter-spacing="0">
+    <tspan x="908" dy="0">Data lifecycle</tspan>
+  </text>
+        
+          <circle cx="920" cy="642" r="4" fill="#B66A0A"/>
+          <text x="936" y="648" fill="#66635D" font-family="Inter" font-size="16" font-weight="500" text-anchor="start" opacity="1"  letter-spacing="0">
+    <tspan x="936" dy="0">In-app deletion request</tspan>
+  </text>
+        
+          <circle cx="920" cy="672" r="4" fill="#B66A0A"/>
+          <text x="936" y="678" fill="#66635D" font-family="Inter" font-size="16" font-weight="500" text-anchor="start" opacity="1"  letter-spacing="0">
+    <tspan x="936" dy="0">Anonymisation path</tspan>
+  </text>
+        
+          <circle cx="920" cy="702" r="4" fill="#B66A0A"/>
+          <text x="936" y="708" fill="#66635D" font-family="Inter" font-size="16" font-weight="500" text-anchor="start" opacity="1"  letter-spacing="0">
+    <tspan x="936" dy="0">Legal and security pages</tspan>
+  </text>
+        
+  
+  </svg>

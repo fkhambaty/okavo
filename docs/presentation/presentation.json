@@ -1,0 +1,409 @@
+{
+  "name": "Okavo",
+  "shortName": "Okavo",
+  "slug": "okavo",
+  "appId": "org.okavo.app",
+  "font": "Archivo",
+  "bodyFont": "Inter",
+  "coverTitle": "Clear scope.\nCredible talent.",
+  "tagline": "A focused marketplace for buyers and identity-checked software developers—without pretending to hold the money.",
+  "screenshot": "assets",
+  "palette": {
+    "bg": "#F5F2EC",
+    "cover": "#0A0B0D",
+    "coverInk": "#FFFFFF",
+    "coverMuted": "#CAC4B9",
+    "ink": "#0A0B0D",
+    "muted": "#66635D",
+    "accent": "#B66A0A",
+    "secondary": "#D6A655",
+    "tint": "#F1E2C9",
+    "card": "#FFFFFF",
+    "line": "#D9D1C4",
+    "phone": "#090A0C",
+    "onAccent": "#FFFFFF"
+  },
+  "slides": [
+    {
+      "type": "cover"
+    },
+    {
+      "type": "statement",
+      "eyebrow": "Why this product",
+      "title": "Software work needs clarity before velocity",
+      "lead": "Okavo creates a structured place to define work, assess people and operate a project—without overstating platform guarantees.",
+      "items": [
+        {
+          "icon": "01",
+          "title": "Lock the scope",
+          "body": "Buyers turn an idea into explicit requirements before comparing bids."
+        },
+        {
+          "icon": "02",
+          "title": "Make identity visible",
+          "body": "Developers can complete identity checks and capability exams."
+        },
+        {
+          "icon": "03",
+          "title": "Keep claims honest",
+          "body": "Okavo coordinates the work; it does not claim to hold buyer funds."
+        }
+      ]
+    },
+    {
+      "type": "personas",
+      "eyebrow": "Every user point of view",
+      "title": "Four views of one marketplace",
+      "lead": "Public trust, buying, delivery and platform operations each have a distinct mobile surface.",
+      "items": [
+        {
+          "icon": "G",
+          "title": "Public visitor",
+          "goal": "“Explain the model before I join.”",
+          "value": "How it works, FAQ, terms, privacy, security and explicit non-guarantees."
+        },
+        {
+          "icon": "B",
+          "title": "Buyer",
+          "goal": "“Define and manage my project.”",
+          "value": "Requirements, projects, developer search, contracts and messages."
+        },
+        {
+          "icon": "D",
+          "title": "Developer",
+          "goal": "“Prove fit and win work.”",
+          "value": "Bids, identity upload, exams, contract work and earnings visibility."
+        },
+        {
+          "icon": "A",
+          "title": "Administrator",
+          "goal": "“Operate a trustworthy market.”",
+          "value": "Review queues, account controls, operational actions and audit trails."
+        }
+      ]
+    },
+    {
+      "type": "journey",
+      "eyebrow": "Marketplace journey",
+      "title": "From requirement to accountable delivery",
+      "lead": "The product makes each transition visible so participants know what changed and who acts next.",
+      "steps": [
+        {
+          "title": "Define",
+          "body": "Write requirements"
+        },
+        {
+          "title": "Discover",
+          "body": "Search talent"
+        },
+        {
+          "title": "Bid",
+          "body": "Compare proposals"
+        },
+        {
+          "title": "Contract",
+          "body": "Agree the work"
+        },
+        {
+          "title": "Collaborate",
+          "body": "Message + files"
+        },
+        {
+          "title": "Operate",
+          "body": "Track outcomes"
+        }
+      ],
+      "footer": "Payments remain disabled until a verified money flow exists"
+    },
+    {
+      "type": "features",
+      "eyebrow": "Buyer experience",
+      "title": "Structure the work before choosing the team",
+      "lead": "Buyers can move from an initial requirement to an operating project without losing the decision trail.",
+      "groups": [
+        {
+          "icon": "R",
+          "title": "Requirements",
+          "highlight": true,
+          "items": [
+            "Create and refine project needs",
+            "Make scope explicit",
+            "Keep requirement history visible"
+          ]
+        },
+        {
+          "icon": "P",
+          "title": "Projects",
+          "items": [
+            "Buyer project portfolio",
+            "Status-aware project detail",
+            "Clear next actions"
+          ]
+        },
+        {
+          "icon": "S",
+          "title": "Developer search",
+          "items": [
+            "Find relevant specialists",
+            "Review visible qualifications",
+            "Move from profile to conversation"
+          ]
+        },
+        {
+          "icon": "C",
+          "title": "Contracts + messages",
+          "items": [
+            "Contract workspace",
+            "Project-linked conversations",
+            "Files and download handling"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "features",
+      "eyebrow": "Developer experience",
+      "title": "Show evidence, submit a bid, deliver the work",
+      "lead": "Developers get a professional path from identity and capability evidence to proposals, contracts and earnings records.",
+      "groups": [
+        {
+          "icon": "B",
+          "title": "Bids",
+          "highlight": true,
+          "items": [
+            "Discover bid opportunities",
+            "Submit structured proposals",
+            "Track bid state"
+          ]
+        },
+        {
+          "icon": "ID",
+          "title": "Identity",
+          "items": [
+            "Upload identity evidence",
+            "Camera and file support",
+            "Review status visibility"
+          ]
+        },
+        {
+          "icon": "E",
+          "title": "Exams",
+          "items": [
+            "Capability-assessment flow",
+            "Visible completion state",
+            "Evidence attached to the profile"
+          ]
+        },
+        {
+          "icon": "₹",
+          "title": "Work + earnings",
+          "items": [
+            "Contract workspace",
+            "Project communications",
+            "Earnings records without custody claims"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "features",
+      "eyebrow": "Administration",
+      "title": "The operating layer behind marketplace trust",
+      "lead": "Administrators see queues and actions that buyers and developers should never need to understand.",
+      "groups": [
+        {
+          "icon": "Q",
+          "title": "Review queues",
+          "highlight": true,
+          "items": [
+            "Identity review workflow",
+            "Status and decision visibility",
+            "Focused operational triage"
+          ]
+        },
+        {
+          "icon": "U",
+          "title": "User operations",
+          "items": [
+            "Role-aware account handling",
+            "Operational account actions",
+            "Anonymisation support"
+          ]
+        },
+        {
+          "icon": "L",
+          "title": "Auditability",
+          "items": [
+            "Recorded sensitive actions",
+            "Admin-only controls",
+            "Traceable operational state"
+          ]
+        },
+        {
+          "icon": "!",
+          "title": "Boundary control",
+          "items": [
+            "No enabled payment custody",
+            "Explicit non-guarantees",
+            "No demo-login shortcut in app"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "features",
+      "eyebrow": "Trust and privacy",
+      "title": "Credibility comes from boundaries",
+      "lead": "Okavo is explicit about what it secures, what it records and what it does not guarantee.",
+      "groups": [
+        {
+          "icon": "S",
+          "title": "Session security",
+          "highlight": true,
+          "items": [
+            "Rotating authenticated sessions",
+            "Secure device token storage",
+            "Role-aware route protection"
+          ]
+        },
+        {
+          "icon": "F",
+          "title": "File handling",
+          "items": [
+            "Camera and file-picker support",
+            "Controlled uploads",
+            "Safe file downloads"
+          ]
+        },
+        {
+          "icon": "N",
+          "title": "Notifications",
+          "items": [
+            "Action-oriented mobile alerts",
+            "Deep-link aware routing",
+            "Permission-aware behaviour"
+          ]
+        },
+        {
+          "icon": "D",
+          "title": "Data lifecycle",
+          "items": [
+            "In-app deletion request",
+            "Anonymisation path",
+            "Legal and security pages"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "architecture",
+      "eyebrow": "Mobile architecture",
+      "title": "A fully native operational shell",
+      "lead": "Role-sensitive product flows run in React Native while the existing API remains the authoritative business layer.",
+      "layers": [
+        {
+          "title": "Android + iOS",
+          "body": "One React Native product with platform packaging, icons and permissions."
+        },
+        {
+          "title": "Role-aware shell",
+          "body": "Public, buyer, developer and administrator navigation with guarded routes."
+        },
+        {
+          "title": "Device capabilities",
+          "body": "Secure storage, camera, file picker, downloads and notifications."
+        },
+        {
+          "title": "Existing API",
+          "body": "Identity, projects, bids, contracts, messages, files and operations."
+        }
+      ],
+      "nativeLabel": "Native: all primary user journeys",
+      "webLabel": "Browser: public legal/support links",
+      "safetyLabel": "Guardrails: roles + rotation + audit"
+    },
+    {
+      "type": "evidence",
+      "eyebrow": "Quality evidence",
+      "title": "Critical roles tested as real mobile paths",
+      "lead": "The release evidence spans public entry, authenticated roles and device-specific capabilities.",
+      "metrics": [
+        {
+          "value": "4",
+          "label": "user perspectives"
+        },
+        {
+          "value": "API 36",
+          "label": "Android emulator verification"
+        },
+        {
+          "value": "Hermes",
+          "label": "iOS JavaScript export"
+        },
+        {
+          "value": "OFF",
+          "label": "payments intentionally disabled"
+        }
+      ],
+      "checks": [
+        "Release APK built and installed",
+        "Role-specific navigation exercised",
+        "Type, lint and automated tests passed",
+        "Architecture and release runbooks included"
+      ]
+    },
+    {
+      "type": "readiness",
+      "eyebrow": "Store readiness",
+      "title": "Prepared for final signing and review",
+      "lead": "The app has not been approved by either store. Owner credentials and full signed iOS validation remain mandatory.",
+      "ready": [
+        "Branded icon, public home and role experiences",
+        "Android release build and device verification",
+        "iOS export verification and native project",
+        "Deletion, privacy, security and legal entry points",
+        "Architecture, testing and release documentation"
+      ],
+      "before": [
+        "Provide Apple signing and App Store Connect access",
+        "Provide Google Play Console access and signing",
+        "Run signed iOS build and device capability tests",
+        "Complete privacy and marketplace declarations",
+        "Capture final listing media and submit"
+      ]
+    },
+    {
+      "type": "statement",
+      "eyebrow": "Why approve",
+      "title": "A serious marketplace in a small-screen format",
+      "lead": "The mobile product makes Okavo’s strongest idea more accessible: clearly defined work matched with visible evidence.",
+      "items": [
+        {
+          "icon": "C",
+          "title": "Clarity",
+          "body": "Requirements, bids and contracts stay connected to the work."
+        },
+        {
+          "icon": "T",
+          "title": "Trust",
+          "body": "Identity, roles and audit boundaries are visible without inflated guarantees."
+        },
+        {
+          "icon": "M",
+          "title": "Mobility",
+          "body": "Messages, files and decisions can move with the people doing the work."
+        }
+      ]
+    },
+    {
+      "type": "approval",
+      "title": "Approve the next step:\nsigned store builds",
+      "lead": "The product story, role model and mobile architecture are ready. The remaining gates are controlled credentials, signed iOS testing and store review.",
+      "actions": [
+        "Approve the marketplace experience",
+        "Release store credentials and assets",
+        "Run final signed builds and submit"
+      ]
+    }
+  ]
+}
